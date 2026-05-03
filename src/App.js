@@ -1,11 +1,41 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import charactersData from "./data/characters.json";
 import skillsData from "./data/skills.json";
-import asinsData from "./data/asins.json";
-
+import locationsData from "./data/locations.json";
+import mangaAnimeMap from "./data/manga_anime_map.json";
+import netflixIds from "./data/netflix_ids.json";
 const CHARACTERS = [...charactersData].sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0));
+const LOCATIONS = [...locationsData];
 const SKILLS = skillsData;
 const SKILLS_BY_ID = new Map(SKILLS.map((s) => [s.id, s]));
+
+/**
+ * 技検索用：全角・半角・互換字形を Unicode NFKC で揃え、英字は小文字化
+ */
+const unifyAbilitySearchWidthAndCase = (raw) =>
+  String(raw ?? "")
+    .normalize("NFKC")
+    .toLowerCase();
+
+/**
+ * ひらがな（ぁ〜ゖ、小ゃゅょ・っ等を含む）を対応するカタカナへ。漢字・カタカナ・英数はそのまま。
+ */
+const hiraganaToKatakana = (raw) => {
+  let out = "";
+  for (const ch of String(raw ?? "")) {
+    const cp = ch.codePointAt(0);
+    if (cp >= 0x3041 && cp <= 0x3096) {
+      out += String.fromCodePoint(cp + 0x60);
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+};
+
+/** 検索クエリ・比較対象文字列をカタカナ基準の同一キーに正規化（name / reading / description 用） */
+const normalizeAbilitySearchKey = (raw) =>
+  hiraganaToKatakana(unifyAbilitySearchWidthAndCase(raw));
 
 /**
  * ─── Kindle連携用ユーティリティ ───
@@ -27,6 +57,9 @@ const getVolumeFromEpisode = (episode) => {
   const ep = parseInt(episode, 10);
   if (!Number.isFinite(ep) || ep <= 0) return 1;
 
+  // 1巻は話数1〜8まで固定で確実に1巻判定（開始話数マップより優先）
+  if (ep >= 1 && ep <= 8) return 1;
+
   // 114巻より後の話数は最新巻(114)扱い
   if (ep >= VOLUME_STARTS[VOLUME_STARTS.length - 1]) return VOLUME_STARTS.length;
 
@@ -38,18 +71,63 @@ const getVolumeFromEpisode = (episode) => {
   return 1;
 };
 
-// Kindleストアの検索URLを生成（「Kindle版」に絞り込み）
-const getKindleStoreSearchUrl = (vol) => {
-  const query = encodeURIComponent(`ONE PIECE ${vol} Kindle版`);
-  return `https://www.amazon.co.jp/s?k=${query}&i=digital-text`;
+// 114巻の開始話（VOLUME_STARTS の末尾）より十分先は、未単行本収録の可能性として「—」表示
+const LATEST_VOLUME_START_EPISODE = VOLUME_STARTS[VOLUME_STARTS.length - 1];
+const VOLUME_LABEL_UNKNOWN_BEYOND = LATEST_VOLUME_START_EPISODE + 12;
+
+const getVolumeLabelForAppearance = (episode) => {
+  const ep = parseInt(episode, 10);
+  if (!Number.isFinite(ep) || ep <= 0) return "—";
+  if (ep >= VOLUME_LABEL_UNKNOWN_BEYOND) return "—";
+  return String(getVolumeFromEpisode(episode));
 };
 
-// ASINがある巻は Kindle Cloud Reader に直行、なければ検索へフォールバック
-const getKindleUrl = (episode) => {
+/** 登場話リンク用：未収録扱いは「-」、それ以外は「△巻」（角括弧内に入れる文字列） */
+const getEpisodeVolBracketContents = (episode) => {
+  if (getVolumeLabelForAppearance(episode) === "—") return "-";
+  return `${getVolumeFromEpisode(episode)}巻`;
+};
+
+const getEpisodeLinkLabel = (episodeNum) => {
+  return `第${episodeNum}話[${getEpisodeVolBracketContents(episodeNum)}]`;
+};
+
+/**
+ * type: 'mono' | 'color' — ASIN は使わず、Kindle ストア検索 URL のみ生成（高精度クエリ）
+ */
+const getKindleUrl = (episode, type) => {
   const vol = getVolumeFromEpisode(episode);
-  const asin = asinsData?.[String(vol)] || asinsData?.[vol];
-  if (asin) return `https://read.amazon.co.jp/?asin=${asin}`;
-  return getKindleStoreSearchUrl(vol);
+  const query =
+    type === "color"
+      ? `ONE PIECE カラー版 第${vol}巻`
+      : `ONE PIECE 第${vol}巻 モノクロ版`;
+  return `https://www.amazon.co.jp/s?k=${encodeURIComponent(query)}&i=digital-text`;
+};
+
+const getNetflixUrl = (mangaEpisode) => {
+  const animeData = mangaAnimeMap[String(mangaEpisode)];
+  const ONE_PIECE_TOP_ID = "80106403";
+
+  if (animeData != null) {
+    const animeEpNum =
+      typeof animeData === "object" && animeData.ep != null
+        ? String(animeData.ep).trim()
+        : typeof animeData !== "object"
+          ? String(animeData).trim()
+          : "";
+    if (animeEpNum) {
+      const nId = netflixIds[animeEpNum];
+      if (nId) {
+        return `https://www.netflix.com/watch/${nId}`;
+      }
+    }
+  }
+  return `https://www.netflix.com/title/${ONE_PIECE_TOP_ID}`;
+};
+
+const handleKindleNavClick = (episode, url, kind) => {
+  const vol = getVolumeFromEpisode(episode);
+  console.log("[Kindle]", { episode, volume: vol, kind, url });
 };
 
 const getSortedEpisodeNumbers = (episodes) => {
@@ -63,7 +141,7 @@ const getSortedEpisodeNumbers = (episodes) => {
 
 const getEpisodeLinkItems = (episodes) => {
   const nums = getSortedEpisodeNumbers(episodes);
-  return nums.map((n) => ({ episode: n, label: `第${n}話` }));
+  return nums.map((n) => ({ episode: n, label: getEpisodeLinkLabel(n) }));
 };
 
 // ─── Styles ───
@@ -105,37 +183,52 @@ body {
 
 /* ─── Header ─── */
 .header {
-  text-align: center;
-  padding: 32px 0 24px;
   position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding: 92px 20px;
+  background-image: url("/images/header-bg.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-.header::after {
+.header::before {
   content: '';
   position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 200px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--red-main), transparent);
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--bg-dark) 0%, transparent 20%, transparent 80%, var(--bg-dark) 100%),
+    linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.65));
+  z-index: 1;
 }
 
 .logo-title {
+  position: relative;
+  z-index: 2;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 48px;
   letter-spacing: 6px;
-  background: linear-gradient(135deg, var(--red-main), var(--red-deep), #8B1A2B);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 900;
+  color: #A0001C;
   line-height: 1.1;
+  text-shadow:
+    0 0 15px rgba(255, 255, 255, 1),
+    0 0 30px rgba(255, 255, 255, 0.8),
+    2px 2px 4px rgba(255, 255, 255, 1);
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: initial;
 }
 
 .logo-sub {
+  position: relative;
+  z-index: 2;
   font-size: 13px;
-  color: var(--text-muted);
-  letter-spacing: 4px;
-  margin-top: 6px;
+  font-weight: 900;
+  color: #444;
+  letter-spacing: 6px;
+  margin-top: 10px;
+  text-shadow: 0 0 8px #fff;
 }
 
 /* ─── Navigation Tabs ─── */
@@ -301,6 +394,8 @@ body {
   position: relative;
   overflow: hidden;
   box-shadow: 0 8px 26px rgba(20, 20, 20, 0.08);
+  display: flex;
+  flex-direction: column;
 }
 
 .char-card:hover {
@@ -343,16 +438,44 @@ body {
 }
 
 .char-name-container {
-  padding: 16px;
+  padding: 10px 12px 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.char-id-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.char-alias {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--red-main);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
   text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .char-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
-  color: #2d1f14;
+  color: var(--text-main);
+  line-height: 1.2;
   margin: 0;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.02em;
 }
 
 .meta-label {
@@ -367,6 +490,144 @@ body {
 .bounty-value {
   color: var(--red-main);
   font-weight: 700;
+}
+
+/* ─── SBS (detail panel) ─── */
+.sbs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sbs-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.sbs-item.brain {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, rgba(255, 248, 237, 0.95), rgba(255, 241, 220, 0.98));
+  border-color: rgba(200, 150, 10, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.sbs-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.sbs-value {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.sbs-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.sbs-basic .sbs-grid {
+  margin: 0;
+}
+
+.sbs-materials-heading {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+}
+
+.sbs-materials-gallery {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 24px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.sbs-img-field {
+  flex: 0 1 240px;
+  max-width: 240px;
+  min-width: 0;
+}
+
+.sbs-img-field--preload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sbs-img-field--loaded {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 12px 12px 10px;
+  background: var(--bg-card);
+  box-shadow: 0 2px 12px rgba(45, 31, 20, 0.08);
+}
+
+.sbs-img-field-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+.sbs-img-field-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.sbs-img-field-caption {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .sbs-grid {
+    grid-template-columns: 1fr;
+  }
+  .sbs-item.brain {
+    grid-column: auto;
+  }
+  .sbs-materials-gallery {
+    flex-direction: column;
+    align-items: center;
+  }
+  .sbs-img-field {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 240px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 /* ─── Detail Panel ─── */
@@ -424,6 +685,14 @@ body {
 .detail-close:hover {
   background: var(--bg-card);
   color: var(--text-main);
+}
+
+.detail-alias {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--red-main);
+  margin-bottom: 4px;
+  letter-spacing: 0.1em;
 }
 
 .detail-name {
@@ -502,57 +771,426 @@ body {
   max-width: 100%;
 }
 
-/* mobile overflow guard */
+/* mobile overflow guard：狭い画面でも横スクロールで列が潰れない */
 .table-scroll {
   max-width: 100%;
+  min-width: 500px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.table-scroll table {
-  min-width: 520px;
+.table-scroll .appearance-table {
+  min-width: 500px;
 }
 
 /* ─── Appearance Table ─── */
 .appearance-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
 .appearance-table th {
-  text-align: left;
-  padding: 8px 12px;
+  padding: 8px 10px;
   font-size: 11px;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 1px;
   border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 .appearance-table td {
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 13px;
   border-bottom: 1px solid rgba(232, 223, 208, 0.7);
+  vertical-align: middle;
+}
+
+.appearance-table th.appearance-col-vol,
+.appearance-table td.appearance-col-vol {
+  width: 50px;
+  max-width: 50px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.appearance-table th.appearance-col-ep,
+.appearance-table td.appearance-col-ep {
+  width: 70px;
+  max-width: 70px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.appearance-table th.appearance-col-title,
+.appearance-table td.appearance-col-title {
+  width: auto;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appearance-table th.appearance-col-kindle,
+.appearance-table td.appearance-col-kindle {
+  width: 170px;
+  max-width: 170px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.appearance-table td.appearance-col-vol {
+  color: var(--text-dim);
+}
+
+.appearance-table td.appearance-col-ep {
+  color: var(--red-main);
+  font-weight: 700;
 }
 
 .appearance-table tr:hover td {
   background: var(--bg-card);
 }
 
-.kindle-link {
-  color: var(--red-main);
-  text-decoration: none;
-  font-size: 12px;
-  padding: 3px 10px;
-  border: 1px solid var(--red-main);
-  border-radius: 4px;
-  transition: all 0.2s;
-  white-space: nowrap;
+/* ─── Episode list tab (main) ─── */
+.episode-list-container {
+  margin-bottom: 24px;
 }
 
-.kindle-link:hover {
-  background: var(--red-main);
-  color: white;
+.volume-card {
+  display: flex;
+  background: var(--bg-card);
+  border-radius: 20px;
+  margin-bottom: 48px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(45, 31, 20, 0.08);
+  border: 1px solid var(--border);
+}
+
+.volume-sidebar {
+  width: 240px;
+  background: #fdfaf3;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.volume-cover-large {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.volume-card:hover .volume-cover-large {
+  transform: scale(1.03) translateY(-5px);
+}
+
+.volume-badge {
+  margin-top: 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+.volume-badge .vol-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  color: var(--red-main);
+  line-height: 1;
+}
+
+.volume-badge .vol-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.volume-episodes {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 地名タブ用（旧 volume-group / volume-header 相当） */
+.location-volume-block {
+  margin-bottom: 40px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--border);
+}
+
+.location-volume-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #fdfbf7 0%, #f5f0e6 100%);
+  border-left: 6px solid var(--red-main);
+  border-bottom: 2px solid var(--border);
+}
+
+.location-volume-info {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.location-volume-header .vol-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  color: var(--red-main);
+}
+
+.location-volume-header .vol-label {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.location-volume-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.episode-list-row {
+  padding: 18px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(232, 223, 208, 0.4);
+  transition: background 0.2s;
+}
+
+.episode-list-row:last-child {
+  border-bottom: none;
+}
+
+.episode-list-row:hover {
+  background: #fffcf5;
+}
+
+.ep-main-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ep-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red-main);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.ep-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ep-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.anime-info-badge {
+  display: flex;
+  align-items: center;
+  background: #f0f0f0;
+  border-radius: 6px;
+  padding: 2px 2px 2px 8px;
+  gap: 8px;
+  border: 1px solid var(--border);
+  min-width: 100px;
+}
+
+.anime-info-badge .anime-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 10px;
+  color: #888;
+  letter-spacing: 1px;
+}
+
+.anime-info-badge .anime-value {
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 900px) {
+  .volume-card {
+    flex-direction: column;
+  }
+
+  .volume-sidebar {
+    width: 100%;
+    flex-direction: row;
+    padding: 20px;
+    gap: 20px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .volume-cover-large {
+    width: 80px;
+    flex-shrink: 0;
+  }
+
+  .volume-badge {
+    margin-top: 0;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .episode-list-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ep-meta-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ─── Major locations tab ─── */
+.location-main-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.location-name-primary {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.location-chapter-tag {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red-main);
+  flex-shrink: 0;
+}
+
+.location-note-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 10px;
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .location-note-label {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+.kindle-btn-group {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.kindle-btn-group--compact {
+  margin-left: 4px;
+  vertical-align: middle;
+  justify-content: flex-end;
+}
+
+.kindle-btn-mono,
+.kindle-btn-color {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1;
+  border-radius: 4px;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 600;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  transition: filter 0.15s, background 0.15s, color 0.15s;
+}
+
+.kindle-btn-mono {
+  background: #50a0d5;
+  color: #fff;
+  border-color: #50a0d5;
+}
+
+.kindle-btn-mono:hover {
+  filter: brightness(1.08);
+  color: #fff;
+}
+
+.kindle-btn-color {
+  background: #d42d25;
+  color: #fff;
+  border-color: #d42d25;
+}
+
+.kindle-btn-color:hover {
+  filter: brightness(1.08);
+  color: #fff;
+}
+
+.kindle-btn-netflix {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1;
+  border-radius: 4px;
+  color: #ffffff;
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 600;
+  background: #222222;
+  border: 1px solid #222222;
+  transition: all 0.15s;
+  margin-left: 4px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.kindle-btn-netflix:hover {
+  background: #444444;
+  border-color: #444444;
+  filter: brightness(1.2);
 }
 
 /* ─── Ability Cards ─── */
@@ -615,21 +1253,135 @@ body {
   line-height: 1.4;
 }
 
-.episode-links {
+.episode-links-section {
   margin-top: 6px;
   font-size: 10px;
   color: var(--text-dim);
-  line-height: 1.4;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.episode-links a {
-  color: var(--red-main);
-  text-decoration: none;
+.episode-links-heading {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 4px;
 }
 
-.episode-links a:hover {
-  text-decoration: underline;
+.episode-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.episode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.episode-row:last-child {
+  border-bottom: none;
+}
+
+.episode-row .episode-link-label {
+  color: var(--red-main);
+  font-weight: 700;
+  font-size: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.episode-row .kindle-btn-group {
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.episode-links-empty {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 2px 0;
+}
+
+/* ─── DetailPanel: 技アコーディオン ─── */
+.ability-list.ability-accordion-list {
+  gap: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.ability-item {
+  border-bottom: 1px solid rgba(232, 223, 208, 0.6);
+  background: var(--bg-card);
+}
+
+.ability-item:last-child {
+  border-bottom: none;
+}
+
+.ability-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  gap: 12px;
+}
+
+.ability-header:hover {
+  background: #fdfaf3;
+}
+
+.ability-toggle-icon {
+  font-size: 10px;
+  color: var(--red-main);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.ability-item.open .ability-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.ability-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ability-item .ability-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.ability-reading-small {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.ability-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #faf9f5;
+}
+
+.ability-item.open .ability-content {
+  max-height: 3000px;
+  border-top: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.ability-inner-padding {
+  padding: 16px 20px 20px 42px;
 }
 
 /* ─── Relations ─── */
@@ -779,11 +1531,110 @@ body {
   border-top: 1px solid var(--border);
   margin-top: 40px;
 }
+
+.scroll-to-top {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  background-color: var(--red-main);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 15px rgba(160, 0, 28, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: scrollTopPopIn 0.3s ease-out;
+}
+
+.scroll-to-top:hover {
+  background-color: var(--red-deep);
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(160, 0, 28, 0.4);
+}
+
+@keyframes scrollTopPopIn {
+  from {
+    transform: scale(0) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .scroll-to-top {
+    bottom: 20px;
+    right: 20px;
+    width: 45px;
+    height: 45px;
+  }
+}
 `;
 
 // ─── Components ───
 
+function KindleDualLinks({ episode, compact = false, showNetflix = true }) {
+  const monoUrl = getKindleUrl(episode, "mono");
+  const colorUrl = getKindleUrl(episode, "color");
+  const netflixUrl = getNetflixUrl(episode);
+  const rawAnime = mangaAnimeMap[String(episode)];
+  const animeEpForNetflix =
+    rawAnime != null && typeof rawAnime === "object" && rawAnime.ep != null
+      ? String(rawAnime.ep).trim()
+      : rawAnime != null && typeof rawAnime !== "object"
+        ? String(rawAnime).trim()
+        : "";
+  const netflixLinkTitle =
+    animeEpForNetflix !== ""
+      ? `アニメ第${animeEpForNetflix}話を Netflix で開く`
+      : "ONE PIECE（Netflix）";
+  return (
+    <div className={`kindle-btn-group${compact ? " kindle-btn-group--compact" : ""}`}>
+      <a
+        className="kindle-btn-mono"
+        href={monoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => handleKindleNavClick(episode, monoUrl, "mono")}
+      >
+        モノクロ
+      </a>
+      <a
+        className="kindle-btn-color"
+        href={colorUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => handleKindleNavClick(episode, colorUrl, "color")}
+      >
+        カラー
+      </a>
+      {showNetflix && (
+        <a
+          className="kindle-btn-netflix"
+          href={netflixUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={netflixLinkTitle}
+          onClick={() => handleKindleNavClick(episode, netflixUrl, "netflix")}
+        >
+          Netflix
+        </a>
+      )}
+    </div>
+  );
+}
+
 function CharacterCard({ char, onClick }) {
+  const aliasTrim = String(char.alias ?? "").trim();
   return (
     <div className="char-card" onClick={() => onClick(char)}>
       <div className="char-image-container">
@@ -801,41 +1652,172 @@ function CharacterCard({ char, onClick }) {
         </div>
       </div>
       <div className="char-name-container">
+        <div className="char-id-label">{String(char.id).padStart(4, "0")}</div>
+        {aliasTrim ? (
+          <div className="char-alias" title={aliasTrim}>
+            {"\u201c"}
+            {aliasTrim}
+            {"\u201d"}
+          </div>
+        ) : null}
         <div className="char-name">{char.name}</div>
       </div>
     </div>
   );
 }
 
-function DetailPanel({ char, onClose, onNavigate }) {
+function SbsImageField({ src, heading }) {
+  const path = String(src ?? "").trim();
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    setStatus("loading");
+  }, [path]);
+
+  if (!path) return null;
+  if (status === "error") return null;
+
+  const preload = status !== "ok";
+
+  return (
+    <div
+      className={`sbs-img-field ${preload ? "sbs-img-field--preload" : "sbs-img-field--loaded"}`}
+    >
+      {status === "ok" && <div className="sbs-img-field-title">{heading}</div>}
+      <img
+        className="sbs-img-field-photo"
+        src={path}
+        alt="SBS資料画像"
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setStatus("ok")}
+        onError={() => setStatus("error")}
+      />
+      {status === "ok" && <div className="sbs-img-field-caption">{heading}</div>}
+    </div>
+  );
+}
+
+function AbilityAccordionItem({ ability }) {
+  const [open, setOpen] = useState(false);
+  const skill = SKILLS_BY_ID.get(ability.id);
+  const reading = String(skill?.reading ?? ability?.reading ?? "").trim();
+  const items = getEpisodeLinkItems(skill?.episodes);
+
+  const toggle = () => setOpen((v) => !v);
+  const onHeaderKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggle();
+    }
+  };
+
+  return (
+    <div className={`ability-item${open ? " open" : ""}`}>
+      <div
+        className="ability-header"
+        onClick={toggle}
+        onKeyDown={onHeaderKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+      >
+        <span className="ability-toggle-icon" aria-hidden="true">
+          ▶
+        </span>
+        <div className="ability-name-row">
+          <span className="ability-name">{ability.name}</span>
+          {reading ? <span className="ability-reading-small">{reading}</span> : null}
+        </div>
+      </div>
+      <div className="ability-content">
+        <div className="ability-inner-padding">
+          <div className="episode-links-section">
+            <div className="episode-links-heading">登場話</div>
+            {items.length ? (
+              <div className="episode-links">
+                {items.map((it) => (
+                  <div key={it.episode} className="episode-row">
+                    <span className="episode-link-label">{it.label}</span>
+                    <KindleDualLinks episode={it.episode} compact />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="episode-links-empty">—</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailPanel({ char, onClose }) {
   const [tab, setTab] = useState("appearances");
+
+  useEffect(() => {
+    setTab("appearances");
+  }, [char?.id]);
 
   const appearances = char.appearances || [];
   const coverAppearances = appearances.filter((a) => String(a?.title ?? "").includes("の扉絵"));
   const mainAppearances = appearances.filter((a) => !String(a?.title ?? "").includes("の扉絵"));
 
-  const renderAppearanceTable = (rows) => (
+  const sbs = char.sbs;
+  const animalPart = String(sbs?.animal ?? "").trim();
+  const numberPart = String(sbs?.number ?? "").trim();
+  const animalNumber =
+    animalPart && numberPart
+      ? `${animalPart} / ${numberPart}`
+      : animalPart || numberPart || "";
+
+  const sbsImages = sbs?.images && typeof sbs.images === "object" ? sbs.images : null;
+  const sbsImageSlots =
+    sbsImages == null
+      ? []
+      : [
+          { key: "child", heading: "幼少期の姿", src: sbsImages.child },
+          { key: "future_good", heading: "未来（通常）", src: sbsImages.future_good },
+          { key: "future_bad", heading: "未来（何かあった場合）", src: sbsImages.future_bad },
+        ].filter((row) => String(row.src ?? "").trim());
+  const hasSbsImageUrls =
+    sbsImages != null &&
+    ["child", "future_good", "future_bad"].some((k) => String(sbsImages[k] ?? "").trim());
+
+  const formatCoverTitleForDisplay = (title) => String(title ?? "").replace(/の扉絵/g, "扉絵");
+
+  const renderAppearanceTable = (rows, { normalizeCoverTitle = false, showNetflix = true } = {}) => (
     <div className="table-scroll">
       <table className="appearance-table">
         <thead>
           <tr>
-            <th>話</th>
-            <th>タイトル</th>
-            <th></th>
+            <th className="appearance-col-vol">巻</th>
+            <th className="appearance-col-ep">話</th>
+            <th className="appearance-col-title">タイトル</th>
+            <th className="appearance-col-kindle" aria-label="Kindle"></th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((a, i) => (
+          {rows.map((a, i) => {
+            const volNum = getVolumeLabelForAppearance(a.episode);
+            const volCell = volNum === "—" ? "—" : `${volNum}巻`;
+            return (
             <tr key={i}>
-              <td style={{ color: "var(--red-main)", fontWeight: 700 }}>第{a.episode}話</td>
-              <td>{a.title}</td>
-              <td>
-                <a href={getKindleUrl(a.episode)} target="_blank" rel="noopener noreferrer" className="kindle-link">
-                  Kindleで読む →
-                </a>
+              <td className="appearance-col-vol">{volCell}</td>
+              <td className="appearance-col-ep">第{a.episode}話</td>
+              <td
+                className="appearance-col-title"
+                title={normalizeCoverTitle ? formatCoverTitleForDisplay(a.title) : String(a.title ?? "")}
+              >
+                {normalizeCoverTitle ? formatCoverTitleForDisplay(a.title) : a.title}
+              </td>
+              <td className="appearance-col-kindle">
+                <KindleDualLinks episode={a.episode} showNetflix={showNetflix} />
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -846,6 +1828,13 @@ function DetailPanel({ char, onClose, onNavigate }) {
       <div className="detail-panel">
         <div className="detail-header">
           <button className="detail-close" onClick={onClose}>✕</button>
+          {String(char.alias ?? "").trim() ? (
+            <div className="detail-alias">
+              {"\u201c"}
+              {String(char.alias).trim()}
+              {"\u201d"}
+            </div>
+          ) : null}
           <div className="detail-name">{char.name}</div>
           <div className="detail-name-en">{char.reading}</div>
           <div className="detail-info-grid">
@@ -886,8 +1875,8 @@ function DetailPanel({ char, onClose, onNavigate }) {
           <button className={`detail-tab ${tab === "abilities" ? "active" : ""}`} onClick={() => setTab("abilities")}>
             技・能力
           </button>
-          <button className={`detail-tab ${tab === "relations" ? "active" : ""}`} onClick={() => setTab("relations")}>
-            関係性
+          <button className={`detail-tab ${tab === "sbs" ? "active" : ""}`} onClick={() => setTab("sbs")}>
+            SBS
           </button>
         </div>
 
@@ -898,7 +1887,7 @@ function DetailPanel({ char, onClose, onNavigate }) {
 
           {tab === "covers" && (
             coverAppearances.length > 0 ? (
-              renderAppearanceTable(coverAppearances)
+              renderAppearanceTable(coverAppearances, { normalizeCoverTitle: true, showNetflix: false })
             ) : (
               <div className="empty-state" style={{ padding: "24px 0" }}>
                 <div className="empty-state-text">扉絵への登場はありません</div>
@@ -907,53 +1896,71 @@ function DetailPanel({ char, onClose, onNavigate }) {
           )}
 
           {tab === "abilities" && (
-            <div className="ability-list">
+            <div className="ability-list ability-accordion-list">
               {(char.abilities || []).map((ab, i) => (
-                <div className="ability-card" key={i}>
-                  <div className="ability-info">
-                    <div className="ability-name">{ab.name}</div>
-                    <div className="ability-desc">{SKILLS_BY_ID.get(ab.id)?.description || ab.reading || "—"}</div>
-                    <div className="episode-links">
-                      登場話:{" "}
-                      {(() => {
-                        const skill = SKILLS_BY_ID.get(ab.id);
-                        const items = getEpisodeLinkItems(skill?.episodes);
-                        return items.length ? (
-                          items.map((it, idx) => (
-                            <span key={it.episode}>
-                              {idx > 0 ? "、" : ""}
-                              <a href={getKindleUrl(it.episode)} target="_blank" rel="noopener noreferrer">
-                                {it.label}
-                              </a>
-                            </span>
-                          ))
-                        ) : (
-                          "—"
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
+                <AbilityAccordionItem key={ab.id != null ? String(ab.id) : `ab-${char.id}-${i}`} ability={ab} />
               ))}
             </div>
           )}
 
-          {tab === "relations" && (
-            <div className="relation-list">
-              {(char.coAppearances || []).map((rel, i) => {
-                const relChar = CHARACTERS.find((c) => c.id === rel.id);
-                return (
-                  <div className="relation-card" key={i} onClick={() => relChar && onNavigate(relChar)}>
-                    <span className="relation-type" style={{ background: "#6662", color: "#666" }}>
-                      共演
-                    </span>
-                    <div className="relation-name">{relChar?.name || rel.name || String(rel.id)}</div>
-                    <div className="relation-label">共演回数: {rel.count}</div>
+          {tab === "sbs" && (
+            sbs ? (
+              <div className="sbs-tab">
+                <div className="sbs-basic">
+                  <div className="sbs-grid">
+                    <div className="sbs-item">
+                      <div className="sbs-label">イメージ国</div>
+                      <div className="sbs-value">{String(sbs.nationality ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">イメージカラー</div>
+                      <div className="sbs-value">{String(sbs.color ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">家族に例えると</div>
+                      <div className="sbs-value">{String(sbs.family ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item brain">
+                      <div className="sbs-label">脳内構造</div>
+                      <div className="sbs-value">{String(sbs.brain ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">入浴頻度</div>
+                      <div className="sbs-value">{String(sbs.bath ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">睡眠時間</div>
+                      <div className="sbs-value">{String(sbs.sleep ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">イメージの香り</div>
+                      <div className="sbs-value">{String(sbs.scent ?? "").trim() || "—"}</div>
+                    </div>
+                    <div className="sbs-item">
+                      <div className="sbs-label">イメージ動物・番号</div>
+                      <div className="sbs-value">{animalNumber || "—"}</div>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                {hasSbsImageUrls && (
+                  <section className="sbs-materials" aria-label="設定資料（SBS画像）">
+                    <h3 className="sbs-materials-heading">設定資料（SBS画像）</h3>
+                    <div className="sbs-materials-gallery">
+                      {sbsImageSlots.map((row) => (
+                        <SbsImageField key={row.key} src={row.src} heading={row.heading} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            ) : (
+              <div className="empty-state" style={{ padding: "24px 0" }}>
+                <div className="empty-state-text">このキャラクターのSBS情報はありません</div>
+              </div>
+            )
           )}
+
         </div>
       </div>
     </div>
@@ -964,13 +1971,101 @@ function DetailPanel({ char, onClose, onNavigate }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("characters");
   const [search, setSearch] = useState("");
+  const [episodeSearch, setEpisodeSearch] = useState("");
+  const [locationSearch, setLocationSearch] = useState("");
   const [crewFilter, setCrewFilter] = useState("all");
   const [selectedChar, setSelectedChar] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    console.log("Anime Map Data:", mangaAnimeMap);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const crews = useMemo(() => {
     const set = new Set(CHARACTERS.map((c) => c.affiliation).filter(Boolean));
     return ["all", ...set];
   }, []);
+
+  /** 全キャラの登場話を話数でユニーク化した一覧（漫画話数ベース） */
+  const mangaEpisodes = useMemo(() => {
+    const byEp = new Map();
+    for (const c of CHARACTERS) {
+      for (const a of c.appearances || []) {
+        const ep = parseInt(a?.episode, 10);
+        if (!Number.isFinite(ep) || ep <= 0) continue;
+        if (!byEp.has(ep)) {
+          const title = String(a?.title ?? "").trim() || "—";
+          byEp.set(ep, { episode: ep, title });
+        }
+      }
+    }
+    return Array.from(byEp.values()).sort((x, y) => x.episode - y.episode);
+  }, []);
+
+  const episodesByVolume = useMemo(() => {
+    const q = episodeSearch.trim();
+    const qLower = q.toLowerCase();
+    const filtered = mangaEpisodes.filter((ep) => {
+      if (!q) return true;
+      return (
+        (ep.title || "").toLowerCase().includes(qLower) ||
+        String(ep.episode).includes(q)
+      );
+    });
+    const groups = {};
+    filtered.forEach((ep) => {
+      const volLabel = getVolumeLabelForAppearance(ep.episode);
+      const volKey = volLabel === "—" ? "—" : String(getVolumeFromEpisode(ep.episode));
+      if (!groups[volKey]) groups[volKey] = [];
+      groups[volKey].push(ep);
+    });
+    Object.keys(groups).forEach((k) => {
+      groups[k].sort((a, b) => a.episode - b.episode);
+    });
+    return groups;
+  }, [mangaEpisodes, episodeSearch]);
+
+  const locationsByVolume = useMemo(() => {
+    const q = locationSearch.trim();
+    const qNorm = q.normalize("NFKC").toLowerCase();
+    const filtered = LOCATIONS.filter((loc) => {
+      if (!q) return true;
+      const name = String(loc.name ?? "")
+        .normalize("NFKC")
+        .toLowerCase();
+      const note = String(loc.note ?? "")
+        .normalize("NFKC")
+        .toLowerCase();
+      return name.includes(qNorm) || note.includes(qNorm) || String(loc.chapter).includes(q);
+    });
+    const groups = {};
+    filtered.forEach((loc) => {
+      const volLabel = getVolumeLabelForAppearance(loc.chapter);
+      const volKey = volLabel === "—" ? "—" : String(getVolumeFromEpisode(loc.chapter));
+      if (!groups[volKey]) groups[volKey] = [];
+      groups[volKey].push(loc);
+    });
+    Object.keys(groups).forEach((k) => {
+      groups[k].sort((a, b) => a.chapter - b.chapter || String(a.name).localeCompare(String(b.name), "ja"));
+    });
+    return groups;
+  }, [locationSearch]);
 
   const filteredChars = useMemo(() => {
     return CHARACTERS.filter((c) => {
@@ -978,7 +2073,6 @@ export default function App() {
         !search ||
         c.name.includes(search) ||
         (c.reading || "").includes(search) ||
-        (c.affiliation || "").includes(search) ||
         (c.devilFruit || "").includes(search);
       const matchCrew = crewFilter === "all" || (c.affiliation || "") === crewFilter;
       return matchSearch && matchCrew;
@@ -986,14 +2080,16 @@ export default function App() {
   }, [search, crewFilter]);
 
   const abilityResults = useMemo(() => {
-    if (activeTab !== "abilities" || !search) return [];
-    const q = search.toLowerCase();
+    if (activeTab !== "abilities") return [];
+    const trimmed = search.trim();
+    if (!trimmed) return [];
+    const q = normalizeAbilitySearchKey(trimmed);
+    if (!q) return [];
     return SKILLS.filter((s) => {
-      return (
-        s.name.toLowerCase().includes(q) ||
-        (s.reading || "").toLowerCase().includes(q) ||
-        (s.description || "").toLowerCase().includes(q)
-      );
+      const name = normalizeAbilitySearchKey(s.name ?? "");
+      const reading = normalizeAbilitySearchKey(s.reading ?? "");
+      const desc = normalizeAbilitySearchKey(s.description ?? "");
+      return name.includes(q) || reading.includes(q) || desc.includes(q);
     });
   }, [activeTab, search]);
 
@@ -1010,6 +2106,8 @@ export default function App() {
           {[
             { key: "characters", label: "キャラクター" },
             { key: "abilities", label: "技・能力検索" },
+            { key: "locations", label: "主要な地名" },
+            { key: "episodes", label: "エピソード一覧" },
           ].map((t) => (
             <button
               key={t.key}
@@ -1017,6 +2115,8 @@ export default function App() {
               onClick={() => {
                 setActiveTab(t.key);
                 setSearch("");
+                setEpisodeSearch("");
+                setLocationSearch("");
               }}
             >
               {t.label}
@@ -1031,7 +2131,7 @@ export default function App() {
               <div className="search-box">
                 <input
                   className="search-input"
-                  placeholder="キャラクター名、よみ、所属、悪魔の実で検索..."
+                  placeholder="キャラクター名、読み、悪魔の実で検索…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -1104,24 +2204,26 @@ export default function App() {
                             <div className="ability-first-use">
                               使用者: {(s.users || []).slice(0, 6).map((u) => u.name).join("、") || "—"}
                             </div>
-                            <div className="episode-links">
-                              登場話:{" "}
-                              {(() => {
-                                const items = getEpisodeLinkItems(s.episodes);
-                                return items.length ? (
-                                  items.map((it, idx) => (
-                                    <span key={it.episode}>
-                                      {idx > 0 ? "、" : ""}
-                                      <a href={getKindleUrl(it.episode)} target="_blank" rel="noopener noreferrer">
-                                        {it.label}
-                                      </a>
-                                    </span>
-                                  ))
-                                ) : (
-                                  "—"
-                                );
-                              })()}
-                            </div>
+                            {(() => {
+                              const items = getEpisodeLinkItems(s.episodes);
+                              return (
+                                <div className="episode-links-section">
+                                  <div className="episode-links-heading">登場話:</div>
+                                  {items.length ? (
+                                    <div className="episode-links">
+                                      {items.map((it) => (
+                                        <div key={it.episode} className="episode-row">
+                                          <span className="episode-link-label">{it.label}</span>
+                                          <KindleDualLinks episode={it.episode} compact />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="episode-links-empty">—</span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -1138,18 +2240,170 @@ export default function App() {
           </>
         )}
 
+        {/* ─── Major locations tab ─── */}
+        {activeTab === "locations" && (
+          <div className="episode-list-container">
+            <div className="search-area">
+              <div className="search-box">
+                <input
+                  className="search-input"
+                  placeholder="地名・補足・話数で検索..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {Object.keys(locationsByVolume).length > 0 ? (
+              Object.keys(locationsByVolume)
+                .sort((a, b) => {
+                  if (a === "—") return 1;
+                  if (b === "—") return -1;
+                  return Number(a) - Number(b);
+                })
+                .map((vol) => (
+                  <div key={vol} className="location-volume-block">
+                    <div className="location-volume-header">
+                      <div className="location-volume-info">
+                        <span className="vol-num">{vol}</span>
+                        <span className="vol-label">巻</span>
+                      </div>
+                    </div>
+                    <div className="location-volume-rows">
+                      {locationsByVolume[vol].map((loc) => (
+                        <div key={`${loc.chapter}-${loc.name}`} className="episode-list-row">
+                          <div className="location-main-info">
+                            <span className="location-name-primary">{loc.name}</span>
+                            <span className="location-chapter-tag">第{loc.chapter}話</span>
+                            {loc.note ? <span className="location-note-label">{loc.note}</span> : null}
+                          </div>
+                          <div className="ep-meta-info">
+                            <KindleDualLinks episode={loc.chapter} compact />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon">🗺️</div>
+                <div className="empty-state-text">
+                  {locationSearch.trim()
+                    ? "該当する地名が見つかりませんでした"
+                    : "表示できる地名がありません"}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Episodes list tab ─── */}
+        {activeTab === "episodes" && (
+          <div className="episode-list-container">
+            <div className="search-area">
+              <div className="search-box">
+                <input
+                  className="search-input"
+                  placeholder="話数やタイトルで検索..."
+                  value={episodeSearch}
+                  onChange={(e) => setEpisodeSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {Object.keys(episodesByVolume).length > 0 ? (
+              Object.keys(episodesByVolume)
+                .sort((a, b) => {
+                  if (a === "—") return 1;
+                  if (b === "—") return -1;
+                  return Number(a) - Number(b);
+                })
+                .map((vol) => (
+                  <div key={vol} className="volume-card">
+                    <div className="volume-sidebar">
+                      <img
+                        src={`/images/covers/${vol}.png`}
+                        alt={`Volume ${vol}`}
+                        className="volume-cover-large"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                      <div className="volume-badge">
+                        <span className="vol-num">{vol}</span>
+                        <span className="vol-label">VOL.</span>
+                      </div>
+                    </div>
+                    <div className="volume-episodes">
+                      {episodesByVolume[vol].map((ep) => {
+                        const epKey = String(ep.episode);
+                        const rawAnime = mangaAnimeMap[epKey];
+                        const animeEpNum =
+                          rawAnime != null && typeof rawAnime === "object" && rawAnime.ep != null
+                            ? String(rawAnime.ep).trim()
+                            : rawAnime != null && typeof rawAnime !== "object"
+                              ? String(rawAnime).trim()
+                              : "";
+                        const hasAnime = animeEpNum !== "";
+                        const animeDisplay = hasAnime ? `第${animeEpNum}話` : "—";
+                        return (
+                          <div key={ep.episode} className="episode-list-row">
+                            <div className="ep-main-info">
+                              <span className="ep-number">第{ep.episode}話</span>
+                              <span className="ep-title" title={ep.title}>
+                                {ep.title}
+                              </span>
+                            </div>
+                            <div className="ep-meta-info">
+                              <div
+                                className="anime-info-badge"
+                                aria-label={hasAnime ? `アニメ${animeDisplay}` : "アニメ話数未登録"}
+                              >
+                                <span className="anime-label">ANIME</span>
+                                <span className="anime-value">{animeDisplay}</span>
+                              </div>
+                              <KindleDualLinks episode={ep.episode} compact />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon">📖</div>
+                <div className="empty-state-text">
+                  {episodeSearch.trim()
+                    ? "該当する話が見つかりませんでした"
+                    : "表示できるエピソードがありません"}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ─── Detail Panel ─── */}
         {selectedChar && (
           <DetailPanel
             char={selectedChar}
             onClose={() => setSelectedChar(null)}
-            onNavigate={(c) => setSelectedChar(c)}
           />
         )}
 
         <footer className="app-footer">
           当サイトはファンが制作した非公式のデータベースです。使用している画像や情報の著作権は、著者・出版社および各権利所有者に帰属します。権利を侵害する目的はありません。
         </footer>
+
+        {showScrollTop && (
+          <button
+            type="button"
+            className="scroll-to-top"
+            onClick={scrollToTop}
+            aria-label="トップに戻る"
+          >
+            ▲
+          </button>
+        )}
       </div>
     </>
   );

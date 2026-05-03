@@ -295,6 +295,20 @@ def get_character_list():
     return characters
 
 
+def _basic_info_table_key(raw):
+    """基本情報テーブルの見出しセルを比較用に正規化（全角スペース・末尾コロンを除去）。"""
+    if not raw:
+        return ""
+    return (
+        str(raw)
+        .replace("\u3000", " ")
+        .strip()
+        .rstrip(":")
+        .rstrip("：")
+        .strip()
+    )
+
+
 def get_character_detail(char_info):
     """個別キャラクターページから詳細情報を取得"""
     url = char_info["url"]
@@ -306,6 +320,7 @@ def get_character_detail(char_info):
         "id": char_info["id"],
         "name": char_info["name"],
         "reading": char_info["reading"],
+        "alias": "",
         "gender": "",
         "affiliation": "",
         "devilFruit": "",
@@ -322,20 +337,23 @@ def get_character_detail(char_info):
     for table in tables:
         rows = table.find_all("tr")
         for row in rows:
-            cols = row.find_all("td")
-            if len(cols) == 2:
-                key = cols[0].get_text(strip=True)
-                val = cols[1].get_text(strip=True)
-                if key == "性別":
-                    detail["gender"] = val
-                elif key == "所属組織":
-                    detail["affiliation"] = val
-                elif key == "悪魔の実":
-                    detail["devilFruit"] = val
-                elif key == "最新の懸賞金":
-                    detail["bounty"] = val
-                elif key == "誕生日":
-                    detail["birthday"] = val
+            cols = row.find_all(["th", "td"])
+            if len(cols) != 2:
+                continue
+            key = _basic_info_table_key(cols[0].get_text(strip=True))
+            val = cols[1].get_text(strip=True)
+            if key == "性別":
+                detail["gender"] = val
+            elif key == "所属組織":
+                detail["affiliation"] = val
+            elif key == "悪魔の実":
+                detail["devilFruit"] = val
+            elif key == "最新の懸賞金":
+                detail["bounty"] = val
+            elif key == "誕生日":
+                detail["birthday"] = val
+            elif key == "異名":
+                detail["alias"] = val
 
     # === 初登場回 ===
     headings = soup.find_all(["h3", "h4"])
@@ -569,7 +587,7 @@ def run_full_scrape():
 
 def run_update_check():
     """
-    差分チェック: 前回取得時との差分を検出して更新があったキャラだけ再取得
+    差分チェック: 新キャラの追加に加え、一覧に載る全キャラの「異名」を再取得して characters.json に反映する。
     """
     meta_path = os.path.join(OUTPUT_DIR, "last_updated.json")
     chars_path = os.path.join(OUTPUT_DIR, "characters.json")
@@ -624,6 +642,34 @@ def run_update_check():
     removed_ids = existing_ids - current_ids
     if removed_ids:
         print(f"⚠️  {len(removed_ids)}人のキャラが一覧から消えています")
+
+    # 一覧に載る全員の「異名」を再取得してマージ（既存 JSON に反映）
+    print(f"\n📛 「異名」を全キャラで更新します（{len(current_list)}人 × {DELAY}秒間隔）…")
+    id_index = {c["id"]: i for i, c in enumerate(existing_chars)}
+    with_alias = 0
+    for i, char_info in enumerate(current_list):
+        idx = id_index.get(char_info["id"])
+        if idx is None:
+            continue
+        print(f"   [{i+1}/{len(current_list)}] {char_info['name']}")
+        detail = get_character_detail(char_info)
+        if detail is not None:
+            alias_val = (detail.get("alias") or "").strip()
+            existing_chars[idx]["alias"] = alias_val
+            if alias_val:
+                with_alias += 1
+        time.sleep(DELAY)
+
+    with open(chars_path, "w", encoding="utf-8") as f:
+        json.dump(existing_chars, f, ensure_ascii=False, indent=2)
+    meta = {
+        "lastUpdated": datetime.now().isoformat(),
+        "characterCount": len(existing_chars),
+        "source": "http://onepiecedb.web.fc2.com/"
+    }
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    print(f"\n✅ characters.json を保存しました（異名のあるキャラ: {with_alias}人）")
 
 
 def run_skills_only():
