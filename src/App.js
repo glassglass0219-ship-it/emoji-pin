@@ -41,15 +41,22 @@ const normalizeAbilitySearchKey = (raw) =>
  * ─── Kindle連携用ユーティリティ ───
  */
 
-// 各巻の開始話数（1〜114巻）
+// 各巻の開始話数（1〜115巻）— 110巻1111話〜、115巻（未収録）1167話〜
 const VOLUME_STARTS = [
   1, 9, 18, 27, 36, 45, 54, 63, 72, 82, 91, 100, 109, 118, 127, 137, 146, 156, 167, 177,
   187, 196, 206, 217, 227, 237, 247, 257, 265, 276, 286, 296, 306, 317, 328, 337, 347, 358, 368, 378,
   389, 400, 410, 420, 431, 441, 451, 460, 471, 482, 492, 503, 513, 523, 533, 542, 552, 563, 574, 585,
   595, 604, 615, 626, 637, 647, 657, 668, 679, 689, 701, 711, 722, 732, 743, 753, 764, 776, 786, 796,
   807, 817, 828, 839, 849, 859, 870, 880, 890, 901, 911, 922, 932, 943, 954, 965, 975, 985, 995, 1005,
-  1016, 1026, 1036, 1047, 1058, 1069, 1081, 1091, 1101, 1111, 1122, 1134, 1145, 1156,
+  1016, 1026, 1036, 1047, 1058, 1069, 1081, 1091, 1101, 1111, 1122, 1134, 1145, 1156, 1167,
 ];
+
+/** 配信済みしきい値（必要に応じて更新） */
+const PUBLISHED_LIMITS = {
+  MONO_VOL: 114, // モノクロ版 既刊
+  COLOR_VOL: 106, // カラー版 既刊
+  ANIME_EP: 1160, // アニメ 放送済み
+};
 
 // 話数から巻数を計算する（VOLUME_STARTS による正確マッピング）
 const getVolumeFromEpisode = (episode) => {
@@ -60,10 +67,10 @@ const getVolumeFromEpisode = (episode) => {
   // 1巻は話数1〜8まで固定で確実に1巻判定（開始話数マップより優先）
   if (ep >= 1 && ep <= 8) return 1;
 
-  // 114巻より後の話数は最新巻(114)扱い
+  // 115巻開始話（1167）以降の話数は最新巻(115)扱い
   if (ep >= VOLUME_STARTS[VOLUME_STARTS.length - 1]) return VOLUME_STARTS.length;
 
-  // 末尾から探索すると速く・実装も簡単（114巻固定なので十分）
+  // 末尾から探索すると速く・実装も簡単（115巻まで固定マップ）
   for (let i = VOLUME_STARTS.length - 1; i >= 0; i--) {
     if (ep >= VOLUME_STARTS[i]) return i + 1; // index0 => 1巻
   }
@@ -71,7 +78,7 @@ const getVolumeFromEpisode = (episode) => {
   return 1;
 };
 
-// 114巻の開始話（VOLUME_STARTS の末尾）より十分先は、未単行本収録の可能性として「—」表示
+// 115巻の開始話（VOLUME_STARTS の末尾）より十分先は、未単行本収録の可能性として「—」表示
 const LATEST_VOLUME_START_EPISODE = VOLUME_STARTS[VOLUME_STARTS.length - 1];
 const VOLUME_LABEL_UNKNOWN_BEYOND = LATEST_VOLUME_START_EPISODE + 12;
 
@@ -93,14 +100,14 @@ const getEpisodeLinkLabel = (episodeNum) => {
 };
 
 /**
- * type: 'mono' | 'color' — ASIN は使わず、Kindle ストア検索 URL のみ生成（高精度クエリ）
+ * type: 'mono' | 'color' — ASIN は使わず、Kindle ストア検索 URL のみ生成
  */
 const getKindleUrl = (episode, type) => {
   const vol = getVolumeFromEpisode(episode);
   const query =
     type === "color"
-      ? `ONE PIECE カラー版 第${vol}巻`
-      : `ONE PIECE 第${vol}巻 モノクロ版`;
+      ? `ONE PIECE カラー版 ${vol}`
+      : `ONE PIECE モノクロ版 ${vol}`;
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(query)}&i=digital-text`;
 };
 
@@ -438,44 +445,25 @@ body {
 }
 
 .char-name-container {
-  padding: 10px 12px 14px;
+  padding: 10px 10px 11px;
   background: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-}
-
-.char-id-label {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 11px;
-  letter-spacing: 2px;
-  margin-bottom: 2px;
-  color: var(--text-dim);
-  opacity: 0.7;
-}
-
-.char-alias {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--red-main);
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  text-align: center;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  width: 100%;
 }
 
 .char-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 900;
   color: var(--text-main);
-  line-height: 1.2;
-  margin: 0;
   letter-spacing: 0.02em;
+  line-height: 1.1;
+  margin: 0;
+  text-align: center;
 }
 
 .meta-label {
@@ -875,8 +863,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   border-right: 1px solid var(--border);
   flex-shrink: 0;
+  min-height: 100%;
 }
 
 .volume-cover-large {
@@ -1191,6 +1181,16 @@ body {
   background: #444444;
   border-color: #444444;
   filter: brightness(1.2);
+}
+
+.kindle-btn-group a.disabled {
+  background: #e0e0e0 !important;
+  border-color: #d0d0d0 !important;
+  color: #a0a0a0 !important;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none !important;
+  filter: grayscale(1);
 }
 
 /* ─── Ability Cards ─── */
@@ -1583,48 +1583,53 @@ body {
 // ─── Components ───
 
 function KindleDualLinks({ episode, compact = false, showNetflix = true }) {
+  const vol = getVolumeFromEpisode(episode);
+  const animeData = mangaAnimeMap[String(episode)];
+  const animeEp =
+    animeData != null && typeof animeData === "object" && animeData.ep != null
+      ? parseInt(String(animeData.ep).trim(), 10) || 0
+      : animeData != null && typeof animeData !== "object"
+        ? parseInt(String(animeData).trim(), 10) || 0
+        : 0;
+
+  const isMonoAvailable = vol <= PUBLISHED_LIMITS.MONO_VOL;
+  const isColorAvailable = vol <= PUBLISHED_LIMITS.COLOR_VOL;
+  const isNetflixAvailable = animeEp > 0 && animeEp <= PUBLISHED_LIMITS.ANIME_EP;
+
   const monoUrl = getKindleUrl(episode, "mono");
   const colorUrl = getKindleUrl(episode, "color");
   const netflixUrl = getNetflixUrl(episode);
-  const rawAnime = mangaAnimeMap[String(episode)];
-  const animeEpForNetflix =
-    rawAnime != null && typeof rawAnime === "object" && rawAnime.ep != null
-      ? String(rawAnime.ep).trim()
-      : rawAnime != null && typeof rawAnime !== "object"
-        ? String(rawAnime).trim()
-        : "";
   const netflixLinkTitle =
-    animeEpForNetflix !== ""
-      ? `アニメ第${animeEpForNetflix}話を Netflix で開く`
-      : "ONE PIECE（Netflix）";
+    animeEp > 0 ? `アニメ第${animeEp}話を Netflix で開く` : "ONE PIECE（Netflix）";
+
   return (
     <div className={`kindle-btn-group${compact ? " kindle-btn-group--compact" : ""}`}>
       <a
-        className="kindle-btn-mono"
-        href={monoUrl}
-        target="_blank"
+        className={`kindle-btn-mono ${!isMonoAvailable ? "disabled" : ""}`}
+        href={isMonoAvailable ? monoUrl : undefined}
+        target={isMonoAvailable ? "_blank" : undefined}
         rel="noopener noreferrer"
-        onClick={() => handleKindleNavClick(episode, monoUrl, "mono")}
+        onClick={isMonoAvailable ? () => handleKindleNavClick(episode, monoUrl, "mono") : undefined}
       >
         モノクロ
       </a>
       <a
-        className="kindle-btn-color"
-        href={colorUrl}
-        target="_blank"
+        className={`kindle-btn-color ${!isColorAvailable ? "disabled" : ""}`}
+        href={isColorAvailable ? colorUrl : undefined}
+        target={isColorAvailable ? "_blank" : undefined}
         rel="noopener noreferrer"
-        onClick={() => handleKindleNavClick(episode, colorUrl, "color")}
+        onClick={isColorAvailable ? () => handleKindleNavClick(episode, colorUrl, "color") : undefined}
       >
         カラー
       </a>
       {showNetflix && (
         <a
-          className="kindle-btn-netflix"
-          href={netflixUrl}
-          target="_blank"
+          className={`kindle-btn-netflix ${!isNetflixAvailable ? "disabled" : ""}`}
+          href={isNetflixAvailable ? netflixUrl : undefined}
+          target={isNetflixAvailable ? "_blank" : undefined}
           rel="noopener noreferrer"
-          title={netflixLinkTitle}
-          onClick={() => handleKindleNavClick(episode, netflixUrl, "netflix")}
+          title={isNetflixAvailable ? netflixLinkTitle : undefined}
+          onClick={isNetflixAvailable ? () => handleKindleNavClick(episode, netflixUrl, "netflix") : undefined}
         >
           Netflix
         </a>
@@ -1634,7 +1639,6 @@ function KindleDualLinks({ episode, compact = false, showNetflix = true }) {
 }
 
 function CharacterCard({ char, onClick }) {
-  const aliasTrim = String(char.alias ?? "").trim();
   return (
     <div className="char-card" onClick={() => onClick(char)}>
       <div className="char-image-container">
@@ -1652,14 +1656,6 @@ function CharacterCard({ char, onClick }) {
         </div>
       </div>
       <div className="char-name-container">
-        <div className="char-id-label">{String(char.id).padStart(4, "0")}</div>
-        {aliasTrim ? (
-          <div className="char-alias" title={aliasTrim}>
-            {"\u201c"}
-            {aliasTrim}
-            {"\u201d"}
-          </div>
-        ) : null}
         <div className="char-name">{char.name}</div>
       </div>
     </div>
@@ -2002,21 +1998,22 @@ export default function App() {
     return ["all", ...set];
   }, []);
 
-  /** 全キャラの登場話を話数でユニーク化した一覧（漫画話数ベース） */
+  /** mangaAnimeMap をマスタにした漫画話一覧（登場データがなくても map に title があれば表示） */
   const mangaEpisodes = useMemo(() => {
-    const byEp = new Map();
-    for (const c of CHARACTERS) {
-      for (const a of c.appearances || []) {
-        const ep = parseInt(a?.episode, 10);
-        if (!Number.isFinite(ep) || ep <= 0) continue;
-        if (!byEp.has(ep)) {
-          const title = String(a?.title ?? "").trim() || "—";
-          byEp.set(ep, { episode: ep, title });
-        }
-      }
-    }
-    return Array.from(byEp.values()).sort((x, y) => x.episode - y.episode);
-  }, []);
+    return Object.keys(mangaAnimeMap)
+      .map((epNum) => {
+        const episode = parseInt(epNum, 10);
+        const raw = mangaAnimeMap[epNum];
+        const meta = raw != null && typeof raw === "object" ? raw : {};
+        return {
+          episode,
+          title: meta.title || "タイトル未設定",
+          volume: getVolumeFromEpisode(episode),
+        };
+      })
+      .filter((row) => Number.isFinite(row.episode) && row.episode > 0)
+      .sort((a, b) => a.episode - b.episode);
+  }, [mangaAnimeMap]);
 
   const episodesByVolume = useMemo(() => {
     const q = episodeSearch.trim();
@@ -2073,6 +2070,7 @@ export default function App() {
         !search ||
         c.name.includes(search) ||
         (c.reading || "").includes(search) ||
+        (c.alias || "").includes(search) ||
         (c.devilFruit || "").includes(search);
       const matchCrew = crewFilter === "all" || (c.affiliation || "") === crewFilter;
       return matchSearch && matchCrew;

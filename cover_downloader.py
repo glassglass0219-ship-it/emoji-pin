@@ -1,13 +1,15 @@
 """
-1〜114巻の単行本表紙画像を Fandom Wiki の File:Volume_N.png から取得し、
+1〜115巻の単行本表紙画像を Fandom Wiki の File:Volume_N.png から取得し、
 public/images/covers/ に N.png で保存する（既存ファイルはスキップ）。
 
   pip install requests
   python cover_downloader.py
+  python cover_downloader.py --start 111 --end 114
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import time
@@ -73,18 +75,25 @@ def get_cover(session: requests.Session, vol: int) -> bool:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description="単行本表紙を Fandom の File:Volume_N.png から取得")
+    ap.add_argument("--start", type=int, default=1, help="開始巻（既定: 1）")
+    ap.add_argument("--end", type=int, default=115, help="終了巻（既定: 115）")
+    args = ap.parse_args()
+    start = max(1, args.start)
+    end = max(start, args.end)
+
     os.makedirs(SAVE_DIR, exist_ok=True)
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    print("全巻の表紙画像をダウンロード開始します…")
-    print("※111巻以降など、まだ発売されていない巻はスキップされます。")
+    print(f"表紙画像をダウンロードします（Vol.{start}〜{end}）…")
+    print("※未発売などで Wiki に画像が無い巻はスキップされます。")
 
     downloaded = 0
     skipped_existing = 0
     failed = 0
 
-    for i in range(1, 115):
+    for i in range(start, end + 1):
         path = os.path.join(SAVE_DIR, f"{i}.png")
         existed = os.path.isfile(path)
         ok = get_cover(session, i)
