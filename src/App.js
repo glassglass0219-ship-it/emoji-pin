@@ -4,10 +4,38 @@ import skillsData from "./data/skills.json";
 import locationsData from "./data/locations.json";
 import mangaAnimeMap from "./data/manga_anime_map.json";
 import netflixIds from "./data/netflix_ids.json";
+import organizationMaster from "./data/organization_master.json";
 const CHARACTERS = [...charactersData].sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0));
 const LOCATIONS = [...locationsData];
 const SKILLS = skillsData;
 const SKILLS_BY_ID = new Map(SKILLS.map((s) => [s.id, s]));
+
+/** キャラ検索「登場編」フィルター（データの arcs と一致させる） */
+const ARC_FILTER_OPTIONS = [
+  "東の海（イーストブルー）編",
+  "アラバスタ編",
+  "空島編",
+  "デービーバックファイト編",
+  "ウォーターセブン編",
+  "エニエス・ロビー編",
+  "スリラーバーク編",
+  "シャボンディ諸島編",
+  "女ヶ島アマゾン・リリー編",
+  "大監獄インペルダウン編",
+  "マリンフォード頂上戦争編",
+  "魚人島編",
+  "パンクハザード編",
+  "ドレスローザ編",
+  "ゾウ編",
+  "ホールケーキアイランド編",
+  "世界会議（レヴェリー）編",
+  "ワノ国編",
+  "エッグヘッド編",
+  "エルバフ編",
+  "ゴッドバレー編",
+  "表紙連載",
+  "その他",
+];
 
 /**
  * 技検索用：全角・半角・互換字形を Unicode NFKC で揃え、英字は小文字化
@@ -198,6 +226,12 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.header:active {
+  opacity: 0.9;
 }
 
 .header::before {
@@ -274,6 +308,57 @@ body {
   margin-bottom: 24px;
 }
 
+/* ─── Results Meta (Count) ─── */
+.results-info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 0 4px 12px;
+  border-bottom: 1px solid rgba(232, 223, 208, 0.6);
+}
+
+.results-count-box {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.results-count-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  color: var(--red-main);
+  line-height: 1;
+  text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+}
+
+.results-count-label {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.results-divider {
+  flex-grow: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--border), transparent);
+  margin-left: 20px;
+}
+
+/* 数字が変わった時のアニメーション */
+@keyframes countPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); color: var(--red-bright); }
+  100% { transform: scale(1); }
+}
+
+.count-animate {
+  display: inline-block;
+  animation: countPop 0.3s ease-out;
+}
+
 .search-box {
   display: flex;
   gap: 8px;
@@ -321,6 +406,82 @@ body {
   background: var(--red-main);
   border-color: var(--red-main);
   color: white;
+}
+
+/* ─── Character tab: search + arc + affiliation row ─── */
+.character-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.character-search-row .search-box {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.character-search-row .affiliation-filter {
+  margin-top: 0;
+}
+
+/* ─── Arc / Affiliation Filter (Select) ─── */
+.arc-filter-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.arc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-main);
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  padding: 10px 38px 10px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+  min-width: 200px;
+  max-width: min(280px, 100%);
+}
+
+.arc-select:focus {
+  border-color: var(--red-main);
+}
+
+.arc-select.is-placeholder {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.arc-select.is-placeholder option {
+  color: var(--text-main);
+  -webkit-text-fill-color: var(--text-main);
+}
+
+.arc-placeholder {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  pointer-events: none;
+}
+
+.arc-caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 10px;
+  pointer-events: none;
 }
 
 /* ─── Affiliation Filter (Select) ─── */
@@ -1835,8 +1996,8 @@ function DetailPanel({ char, onClose }) {
           <div className="detail-name-en">{char.reading}</div>
           <div className="detail-info-grid">
             <div className="info-item">
-              <div className="info-label">所属</div>
-              <div className="info-value">{char.affiliation || "—"}</div>
+              <div className="info-label">組織</div>
+              <div className="info-value">{`[${char.category || "—"}] / ${char.group || "—"}`}</div>
             </div>
             <div className="info-item">
               <div className="info-label">懸賞金</div>
@@ -1969,9 +2130,23 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [episodeSearch, setEpisodeSearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
-  const [crewFilter, setCrewFilter] = useState("all");
+  const [orgCategoryFilter, setOrgCategoryFilter] = useState("all");
+  const [orgGroupFilter, setOrgGroupFilter] = useState("all");
+  const [arcFilter, setArcFilter] = useState("all");
   const [selectedChar, setSelectedChar] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const handleHeaderClick = () => {
+    setActiveTab("characters");
+    setSearch("");
+    setEpisodeSearch("");
+    setLocationSearch("");
+    setOrgCategoryFilter("all");
+    setOrgGroupFilter("all");
+    setArcFilter("all");
+    setSelectedChar(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   useEffect(() => {
     console.log("Anime Map Data:", mangaAnimeMap);
@@ -1993,10 +2168,19 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const crews = useMemo(() => {
-    const set = new Set(CHARACTERS.map((c) => c.affiliation).filter(Boolean));
-    return ["all", ...set];
+  const orgCategories = useMemo(() => {
+    const cats = Object.keys(organizationMaster || {});
+    cats.sort((a, b) => a.localeCompare(b, "ja"));
+    return ["all", ...cats];
   }, []);
+
+  const orgGroupsForSelectedCategory = useMemo(() => {
+    if (orgCategoryFilter === "all") return ["all"];
+    const groups = Array.isArray(organizationMaster?.[orgCategoryFilter]) ? organizationMaster[orgCategoryFilter] : [];
+    const uniq = Array.from(new Set(groups.filter(Boolean)));
+    uniq.sort((a, b) => String(a).localeCompare(String(b), "ja"));
+    return ["all", ...uniq];
+  }, [orgCategoryFilter]);
 
   /** mangaAnimeMap をマスタにした漫画話一覧（登場データがなくても map に title があれば表示） */
   const mangaEpisodes = useMemo(() => {
@@ -2072,10 +2256,13 @@ export default function App() {
         (c.reading || "").includes(search) ||
         (c.alias || "").includes(search) ||
         (c.devilFruit || "").includes(search);
-      const matchCrew = crewFilter === "all" || (c.affiliation || "") === crewFilter;
-      return matchSearch && matchCrew;
+      const matchOrgCategory = orgCategoryFilter === "all" || (c.category || "") === orgCategoryFilter;
+      const matchOrgGroup = orgGroupFilter === "all" || (c.group || "") === orgGroupFilter;
+      const arcs = Array.isArray(c.arcs) ? c.arcs : [];
+      const matchArc = arcFilter === "all" || arcs.includes(arcFilter);
+      return matchSearch && matchOrgCategory && matchOrgGroup && matchArc;
     });
-  }, [search, crewFilter]);
+  }, [search, orgCategoryFilter, orgGroupFilter, arcFilter]);
 
   const abilityResults = useMemo(() => {
     if (activeTab !== "abilities") return [];
@@ -2095,7 +2282,7 @@ export default function App() {
     <>
       <style>{styles}</style>
       <div className="app">
-        <header className="header">
+        <header className="header" onClick={handleHeaderClick} style={{ cursor: "pointer" }}>
           <div className="logo-title">GRAND LINE DATABASE</div>
           <div className="logo-sub">ONE PIECE CHARACTER ENCYCLOPEDIA</div>
         </header>
@@ -2126,30 +2313,86 @@ export default function App() {
         {activeTab === "characters" && (
           <>
             <div className="search-area">
-              <div className="search-box">
-                <input
-                  className="search-input"
-                  placeholder="キャラクター名、読み、悪魔の実で検索…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="character-search-row">
+                <div className="search-box">
+                  <input
+                    className="search-input"
+                    placeholder="キャラクター名、読み、悪魔の実で検索…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="arc-filter-wrap">
+                  {arcFilter === "all" && <span className="arc-placeholder">編を選択</span>}
+                  <span className="arc-caret">▼</span>
+                  <select
+                    className={`arc-select ${arcFilter === "all" ? "is-placeholder" : ""}`}
+                    value={arcFilter}
+                    onChange={(e) => setArcFilter(e.target.value)}
+                    aria-label="登場編で絞り込み"
+                  >
+                    <option value="all">すべての編</option>
+                    {ARC_FILTER_OPTIONS.map((arc) => (
+                      <option key={arc} value={arc}>
+                        {arc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="affiliation-filter">
+                  {orgCategoryFilter === "all" && <span className="affiliation-placeholder">分類を選択</span>}
+                  <span className="affiliation-caret">▼</span>
+                  <select
+                    className={`affiliation-select ${orgCategoryFilter === "all" ? "is-placeholder" : ""}`}
+                    value={orgCategoryFilter}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setOrgCategoryFilter(next);
+                      setOrgGroupFilter("all");
+                    }}
+                    aria-label="分類を選択"
+                  >
+                    {orgCategories.map((c) => (
+                      <option key={c} value={c}>
+                        {c === "all" ? "すべて" : c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="affiliation-filter">
+                  {orgGroupFilter === "all" && (
+                    <span className="affiliation-placeholder">
+                      {orgCategoryFilter === "all" ? "組織（分類を先に選択）" : "組織を選択"}
+                    </span>
+                  )}
+                  <span className="affiliation-caret">▼</span>
+                  <select
+                    className={`affiliation-select ${orgGroupFilter === "all" ? "is-placeholder" : ""}`}
+                    value={orgGroupFilter}
+                    onChange={(e) => setOrgGroupFilter(e.target.value)}
+                    aria-label="組織を選択"
+                    disabled={orgCategoryFilter === "all"}
+                  >
+                    {orgGroupsForSelectedCategory.map((g) => (
+                      <option key={g} value={g}>
+                        {g === "all" ? "すべて" : g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="affiliation-filter">
-                {crewFilter === "all" && <span className="affiliation-placeholder">所属を選択</span>}
-                <span className="affiliation-caret">▼</span>
-                <select
-                  className={`affiliation-select ${crewFilter === "all" ? "is-placeholder" : ""}`}
-                  value={crewFilter}
-                  onChange={(e) => setCrewFilter(e.target.value)}
-                  aria-label="所属を選択"
-                >
-                  {crews.map((c) => (
-                    <option key={c} value={c}>
-                      {c === "all" ? "すべて" : c}
-                    </option>
-                  ))}
-                </select>
+            </div>
+
+            {/* ─── Results Info Bar ─── */}
+            <div className="results-info-bar">
+              <div className="results-count-box">
+                <span className="results-count-label">FOUND</span>
+                <span key={filteredChars.length} className="results-count-num count-animate">
+                  {filteredChars.length}
+                </span>
+                <span className="results-count-label">CHARACTERS</span>
               </div>
+              <div className="results-divider"></div>
             </div>
 
             {filteredChars.length > 0 ? (

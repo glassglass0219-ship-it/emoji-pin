@@ -1,0 +1,13 @@
+﻿master_id,master_name,source_index,source_name,resolved,reason,score
+289,パシフィスタ,276,パシフィスタ POLICE,パシフィスタ POLICE,si.find_character,
+289,パシフィスタ,285,パシフィスタ マークⅢ,パシフィスタ マークIII,si.find_character,
+737,ベガパンク,271,ベガパンク PUNK02｢悪｣,ベガパンク PUNK02「悪」,si.find_character,
+737,ベガパンク,272,ベガパンク PUNK01｢正｣,ベガパンク PUNK01「正」,si.find_character,
+737,ベガパンク,273,ベガパンク PUNK05｢暴｣,ベガパンク PUNK05「暴」,si.find_character,
+737,ベガパンク,278,ベガパンク PUNK03｢想｣,ベガパンク PUNK03「想」,si.find_character,
+737,ベガパンク,279,ベガパンク PUNK04｢知｣,ベガパンク PUNK04「知」,si.find_character,
+737,ベガパンク,280,ベガパンク PUNK06｢欲｣,ベガパンク PUNK06「欲」,si.find_character,
+737,ベガパンク,282,ベガパンク,ベガパンク,si.find_character,
+739,セラフィム,304,セラフィム（ドンキホーテ・ドフラミンゴ）,セラフィム(ドンキホーテ・ドフラミンゴ),si.find_character,
+739,セラフィム,305,セラフィム（ゲッコー・モリア）,セラフィム(ゲッコー・モリア),si.find_character,
+739,セラフィム,306,セラフィム（クロコダイル）,セラフィム(クロコダイル),si.find_character,
