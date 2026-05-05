@@ -1,31 +1,176 @@
 [
-  {"name": "フーシャ村", "chapter": 1, "note": "東の海・ドーン島"},
-  {"name": "シェルズタウン", "chapter": 3, "note": "海軍第153支部"},
-  {"name": "オレンジの町", "chapter": 8, "note": "バギー海賊団占拠"},
-  {"name": "シロップ村", "chapter": 23, "note": "ゲッコー諸島"},
-  {"name": "バラティエ", "chapter": 43, "note": "海上レストラン"},
-  {"name": "ココヤシ村", "chapter": 69, "note": "アーロンパーク"},
-  {"name": "ローグタウン", "chapter": 96, "note": "始まりと終わりの町"},
-  {"name": "リヴァース・マウンテン", "chapter": 101, "note": "赤い土の大陸"},
-  {"name": "ウイスキーピーク", "chapter": 106, "note": "サボテン島"},
-  {"name": "リトルガーデン", "chapter": 115, "note": "恐竜の住む島"},
-  {"name": "ドラム王国", "chapter": 131, "note": "冬島"},
-  {"name": "アラバスタ王国", "chapter": 155, "note": "サンディ島"},
-  {"name": "ジャヤ", "chapter": 222, "note": "モックタウン"},
-  {"name": "スカイピア", "chapter": 239, "note": "空島"},
-  {"name": "ロングリングロングランド", "chapter": 305, "note": "遊牧民の島"},
-  {"name": "ウォーターセブン", "chapter": 323, "note": "水の都"},
-  {"name": "エニエス・ロビー", "chapter": 358, "note": "司法の島"},
-  {"name": "スリラーバーク", "chapter": 442, "note": "ゴースト島"},
-  {"name": "シャボンディ諸島", "chapter": 496, "note": "ヤルキマン・マングローブ"},
-  {"name": "女ヶ島 アマゾン・リリー", "chapter": 515, "note": "凪の帯"},
-  {"name": "インペルダウン", "chapter": 525, "note": "大監獄"},
-  {"name": "マリンフォード", "chapter": 550, "note": "海軍本部"},
-  {"name": "魚人島", "chapter": 606, "note": "海底1万メートル"},
-  {"name": "パンクハザード", "chapter": 655, "note": "政府直轄廃止島"},
-  {"name": "ドレスローザ", "chapter": 701, "note": "愛と情熱とオモチャの国"},
-  {"name": "ゾウ", "chapter": 802, "note": "モコモ公国"},
-  {"name": "ホールケーキアイランド", "chapter": 827, "note": "万国（トットランド）"},
-  {"name": "ワノ国", "chapter": 909, "note": "侍の国"},
-  {"name": "エッグヘッド", "chapter": 1061, "note": "未来島"}
+  {
+    "name": "フーシャ村",
+    "chapter": 1,
+    "note": "東の海・ドーン島",
+    "en_name": ""
+  },
+  {
+    "name": "シェルズタウン",
+    "chapter": 3,
+    "note": "海軍第153支部",
+    "en_name": ""
+  },
+  {
+    "name": "オレンジの町",
+    "chapter": 8,
+    "note": "バギー海賊団占拠",
+    "en_name": ""
+  },
+  {
+    "name": "シロップ村",
+    "chapter": 23,
+    "note": "ゲッコー諸島",
+    "en_name": ""
+  },
+  {
+    "name": "バラティエ",
+    "chapter": 43,
+    "note": "海上レストラン",
+    "en_name": ""
+  },
+  {
+    "name": "ココヤシ村",
+    "chapter": 69,
+    "note": "アーロンパーク",
+    "en_name": ""
+  },
+  {
+    "name": "ローグタウン",
+    "chapter": 96,
+    "note": "始まりと終わりの町",
+    "en_name": ""
+  },
+  {
+    "name": "リヴァース・マウンテン",
+    "chapter": 101,
+    "note": "赤い土の大陸",
+    "en_name": ""
+  },
+  {
+    "name": "ウイスキーピーク",
+    "chapter": 106,
+    "note": "サボテン島",
+    "en_name": ""
+  },
+  {
+    "name": "リトルガーデン",
+    "chapter": 115,
+    "note": "恐竜の住む島",
+    "en_name": ""
+  },
+  {
+    "name": "ドラム王国",
+    "chapter": 131,
+    "note": "冬島",
+    "en_name": ""
+  },
+  {
+    "name": "アラバスタ王国",
+    "chapter": 155,
+    "note": "サンディ島",
+    "en_name": ""
+  },
+  {
+    "name": "ジャヤ",
+    "chapter": 222,
+    "note": "モックタウン",
+    "en_name": ""
+  },
+  {
+    "name": "スカイピア",
+    "chapter": 239,
+    "note": "空島",
+    "en_name": ""
+  },
+  {
+    "name": "ロングリングロングランド",
+    "chapter": 305,
+    "note": "遊牧民の島",
+    "en_name": ""
+  },
+  {
+    "name": "ウォーターセブン",
+    "chapter": 323,
+    "note": "水の都",
+    "en_name": ""
+  },
+  {
+    "name": "エニエス・ロビー",
+    "chapter": 358,
+    "note": "司法の島",
+    "en_name": ""
+  },
+  {
+    "name": "スリラーバーク",
+    "chapter": 442,
+    "note": "ゴースト島",
+    "en_name": "Thriller Bark"
+  },
+  {
+    "name": "シャボンディ諸島",
+    "chapter": 496,
+    "note": "ヤルキマン・マングローブ",
+    "en_name": ""
+  },
+  {
+    "name": "女ヶ島 アマゾン・リリー",
+    "chapter": 515,
+    "note": "凪の帯",
+    "en_name": ""
+  },
+  {
+    "name": "インペルダウン",
+    "chapter": 525,
+    "note": "大監獄",
+    "en_name": ""
+  },
+  {
+    "name": "マリンフォード",
+    "chapter": 550,
+    "note": "海軍本部",
+    "en_name": ""
+  },
+  {
+    "name": "魚人島",
+    "chapter": 606,
+    "note": "海底1万メートル",
+    "en_name": ""
+  },
+  {
+    "name": "パンクハザード",
+    "chapter": 655,
+    "note": "政府直轄廃止島",
+    "en_name": ""
+  },
+  {
+    "name": "ドレスローザ",
+    "chapter": 701,
+    "note": "愛と情熱とオモチャの国",
+    "en_name": ""
+  },
+  {
+    "name": "ゾウ",
+    "chapter": 802,
+    "note": "モコモ公国",
+    "en_name": ""
+  },
+  {
+    "name": "ホールケーキアイランド",
+    "chapter": 827,
+    "note": "万国（トットランド）",
+    "en_name": ""
+  },
+  {
+    "name": "ワノ国",
+    "chapter": 909,
+    "note": "侍の国",
+    "en_name": ""
+  },
+  {
+    "name": "エッグヘッド",
+    "chapter": 1061,
+    "note": "未来島",
+    "en_name": ""
+  }
 ]
