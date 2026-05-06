@@ -1807,6 +1807,7 @@ function CharacterCard({ char, onClick }) {
           src={`/images/thumbnails/${char.id}.webp`}
           alt={char.name}
           loading="lazy"
+          decoding="async"
           onError={(e) => {
             e.target.style.display = "none";
             if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
@@ -2242,6 +2243,14 @@ export default function App() {
     return groups;
   }, [mangaEpisodes, episodeSearch]);
 
+  const episodeVolumeKeysSorted = useMemo(() => {
+    return Object.keys(episodesByVolume).sort((a, b) => {
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return Number(a) - Number(b);
+    });
+  }, [episodesByVolume]);
+
   const locationsByVolume = useMemo(() => {
     const q = locationSearch.trim();
     const qNorm = q.normalize("NFKC").toLowerCase();
@@ -2574,19 +2583,15 @@ export default function App() {
               </div>
             </div>
             {Object.keys(episodesByVolume).length > 0 ? (
-              Object.keys(episodesByVolume)
-                .sort((a, b) => {
-                  if (a === "—") return 1;
-                  if (b === "—") return -1;
-                  return Number(a) - Number(b);
-                })
-                .map((vol) => (
+              episodeVolumeKeysSorted.map((vol) => (
                   <div key={vol} className="volume-card">
                     <div className="volume-sidebar">
                       <img
                         src={`/images/covers/${vol}.png`}
                         alt={`Volume ${vol}`}
                         className="volume-cover-large"
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           e.target.style.display = "none";
                         }}
