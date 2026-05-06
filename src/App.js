@@ -1997,7 +1997,11 @@ function DetailPanel({ char, onClose }) {
           <div className="detail-info-grid">
             <div className="info-item">
               <div className="info-label">組織</div>
-              <div className="info-value">{`[${char.category || "—"}] / ${char.group || "—"}`}</div>
+              <div className="info-value">{`[${
+                Array.isArray(char.category) ? (char.category.length ? char.category.join(" / ") : "—") : (char.category || "—")
+              }] / ${
+                Array.isArray(char.group) ? (char.group.length ? char.group.join(" / ") : "—") : (char.group || "—")
+              }`}</div>
             </div>
             <div className="info-item">
               <div className="info-label">懸賞金</div>
@@ -2169,9 +2173,25 @@ export default function App() {
   };
 
   const orgCategories = useMemo(() => {
+    const desiredOrder = [
+      "海賊",
+      "天竜人",
+      "世界政府",
+      "海軍",
+      "革命軍",
+      "科学者",
+      "王家",
+      "戦う者達",
+      "市民",
+      "その他",
+    ];
+
     const cats = Object.keys(organizationMaster || {});
-    cats.sort((a, b) => a.localeCompare(b, "ja"));
-    return ["all", ...cats];
+    const remaining = cats.filter((c) => !desiredOrder.includes(c));
+    remaining.sort((a, b) => a.localeCompare(b, "ja"));
+
+    const ordered = desiredOrder.filter((c) => cats.includes(c));
+    return ["all", ...ordered, ...remaining];
   }, []);
 
   const orgGroupsForSelectedCategory = useMemo(() => {
@@ -2256,8 +2276,10 @@ export default function App() {
         (c.reading || "").includes(search) ||
         (c.alias || "").includes(search) ||
         (c.devilFruit || "").includes(search);
-      const matchOrgCategory = orgCategoryFilter === "all" || (c.category || "") === orgCategoryFilter;
-      const matchOrgGroup = orgGroupFilter === "all" || (c.group || "") === orgGroupFilter;
+      const charCategories = Array.isArray(c.category) ? c.category : (c.category ? [c.category] : []);
+      const matchOrgCategory = orgCategoryFilter === "all" || charCategories.includes(orgCategoryFilter);
+      const charGroups = Array.isArray(c.group) ? c.group : (c.group ? [c.group] : []);
+      const matchOrgGroup = orgGroupFilter === "all" || charGroups.includes(orgGroupFilter);
       const arcs = Array.isArray(c.arcs) ? c.arcs : [];
       const matchArc = arcFilter === "all" || arcs.includes(arcFilter);
       return matchSearch && matchOrgCategory && matchOrgGroup && matchArc;
