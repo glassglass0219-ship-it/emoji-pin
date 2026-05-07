@@ -5,6 +5,7 @@ import locationsData from "./data/locations.json";
 import mangaAnimeMap from "./data/manga_anime_map.json";
 import netflixIds from "./data/netflix_ids.json";
 import organizationMaster from "./data/organization_master.json";
+import updatesData from "./data/updates.json";
 const CHARACTERS = [...charactersData].sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0));
 const LOCATIONS = [...locationsData];
 const SKILLS = skillsData;
@@ -1739,6 +1740,62 @@ body {
     height: 45px;
   }
 }
+
+.updates-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 32px;
+  border-left: 2px solid var(--border);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 40px;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -41px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  background: var(--bg-dark);
+  border: 3px solid var(--red-main);
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.timeline-date {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  color: var(--red-main);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.timeline-content {
+  background: var(--bg-card);
+  padding: 20px 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.timeline-content b {
+  color: var(--red-main);
+  font-weight: 900;
+}
 `;
 
 // ─── Components ───
@@ -2324,6 +2381,7 @@ export default function App() {
             { key: "abilities", label: "技・能力検索" },
             { key: "locations", label: "主要な地名" },
             { key: "episodes", label: "エピソード一覧" },
+            { key: "updates", label: "更新履歴" },
           ].map((t) => (
             <button
               key={t.key}
@@ -2647,6 +2705,25 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── Updates Tab ─── */}
+        {activeTab === "updates" && (
+          <div className="updates-container">
+            <div className="timeline">
+              {[...updatesData]
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+                .map((u, i) => (
+                  <div key={`${u.date}-${i}`} className="timeline-item">
+                    <span className="timeline-date">{u.date}</span>
+                    <div
+                      className="timeline-content"
+                      dangerouslySetInnerHTML={{ __html: u.content }}
+                    />
+                  </div>
+                ))}
+            </div>
           </div>
         )}
 
