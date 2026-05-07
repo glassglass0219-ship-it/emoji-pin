@@ -1796,6 +1796,63 @@ body {
   color: var(--red-main);
   font-weight: 900;
 }
+
+.timeline-content {
+  background: var(--bg-card);
+  padding: 24px 28px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(45, 31, 20, 0.04);
+}
+
+.update-header {
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  background: var(--red-main);
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  letter-spacing: 0.1em;
+}
+
+.update-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.update-char {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+  border-bottom: 1px solid rgba(160, 0, 28, 0.1);
+  padding-bottom: 4px;
+  display: inline-block;
+  width: fit-content;
+}
+
+.update-list {
+  list-style: none;
+  padding-left: 14px;
+  margin: 0 0 4px 0;
+}
+
+.update-list li {
+  font-size: 13px;
+  color: var(--text-muted);
+  position: relative;
+  line-height: 1.8;
+}
+
+.update-list li::before {
+  content: '-';
+  position: absolute;
+  left: -14px;
+  color: var(--red-main);
+  font-weight: bold;
+}
 `;
 
 // ─── Components ───

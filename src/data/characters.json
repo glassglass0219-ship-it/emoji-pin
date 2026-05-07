@@ -28772,6 +28772,14 @@
         "id": 1028,
         "name": "神避",
         "reading": "かむさり"
+      },
+      {
+        "id": 1201,
+        "name": "荒御魂"
+      },
+      {
+        "id": 1203,
+        "name": "火之迦具土慧士"
       }
     ],
     "alias": "ゴール・D・ロジャー",
@@ -29531,7 +29539,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 24,
+        "name": "灼死"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -32611,6 +32624,14 @@
         "id": 851,
         "name": "猫背",
         "reading": "ねこぜ"
+      },
+      {
+        "id": 85,
+        "name": "イガラッパ"
+      },
+      {
+        "id": 92,
+        "name": "イガラッパッパ"
       }
     ],
     "alias": "",
@@ -32719,7 +32740,20 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 94,
+        "name": "鼻空想砲"
+      },
+      {
+        "id": 108,
+        "name": "鼻空想二連砲"
+      },
+      {
+        "id": 109,
+        "name": "そよ風息爆弾"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -32851,7 +32885,20 @@
         "title": "の扉絵"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 95,
+        "name": "1万kgプレス"
+      },
+      {
+        "id": 113,
+        "name": "強くなる石"
+      },
+      {
+        "id": 114,
+        "name": "一万キロギロチン"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -33188,7 +33235,48 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 96,
+        "name": "キャンドルジャケット"
+      },
+      {
+        "id": 97,
+        "name": "キャンドルサービス"
+      },
+      {
+        "id": 98,
+        "name": "ドルドル彫刻「剣」"
+      },
+      {
+        "id": 99,
+        "name": "キャンドルロック"
+      },
+      {
+        "id": 101,
+        "name": "ドルドル彫刻「銛」"
+      },
+      {
+        "id": 102,
+        "name": "キャンドル壁"
+      },
+      {
+        "id": 110,
+        "name": "キャンドルチャンピオン"
+      },
+      {
+        "id": 111,
+        "name": "チャンプファイト「おらが畑」"
+      },
+      {
+        "id": 150,
+        "name": "ドルドルボール"
+      },
+      {
+        "id": 633,
+        "name": "特大サービスキャンドル壁"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -33322,7 +33410,28 @@
         "title": "暴（アトラス）"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 103,
+        "name": "カラーズトラップ「裏切りの黒」"
+      },
+      {
+        "id": 104,
+        "name": "カラーズトラップ「笑いの黄色」"
+      },
+      {
+        "id": 105,
+        "name": "カラーズトラップ「闘牛の赤」"
+      },
+      {
+        "id": 106,
+        "name": "カラーズトラップ「なごみの緑」"
+      },
+      {
+        "id": 107,
+        "name": "カラーズトラップ「悲しみの青」"
+      }
+    ],
     "alias": "",
     "en_name": "Zeff",
     "arcs": [
@@ -33712,7 +33821,56 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 144,
+        "name": "白鳥アラベスク"
+      },
+      {
+        "id": 166,
+        "name": "どうぞオカマい拳"
+      },
+      {
+        "id": 167,
+        "name": "うらぶれ白鳥舞踏会"
+      },
+      {
+        "id": 168,
+        "name": "蹴爪先"
+      },
+      {
+        "id": 169,
+        "name": "マスカラブーメラン"
+      },
+      {
+        "id": 170,
+        "name": "キャッチしマスカラ"
+      },
+      {
+        "id": 171,
+        "name": "あの夏の日の回想録"
+      },
+      {
+        "id": 174,
+        "name": "爆撃白鳥"
+      },
+      {
+        "id": 181,
+        "name": "爆弾白鳥アラベスク"
+      },
+      {
+        "id": 606,
+        "name": "あの秋の夜の夢の二度見"
+      },
+      {
+        "id": 608,
+        "name": "お控え・ナ・鞭打"
+      },
+      {
+        "id": 610,
+        "name": "あの冬の空の回想録"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -34181,7 +34339,24 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 504,
+        "name": "闇穴道"
+      },
+      {
+        "id": 505,
+        "name": "解放"
+      },
+      {
+        "id": 508,
+        "name": "闇水"
+      },
+      {
+        "id": 1164,
+        "name": "震破"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -35053,7 +35228,36 @@
         "title": "大陸の断片"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 201,
+        "name": "斬人"
+      },
+      {
+        "id": 202,
+        "name": "掌握斬"
+      },
+      {
+        "id": 203,
+        "name": "発泡雛菊斬"
+      },
+      {
+        "id": 204,
+        "name": "微塵斬"
+      },
+      {
+        "id": 206,
+        "name": "螺旋抜斬"
+      },
+      {
+        "id": 207,
+        "name": "滅裂斬"
+      },
+      {
+        "id": 208,
+        "name": "微塵斬速力"
+      }
+    ],
     "alias": "",
     "covers": [
       {
@@ -35174,7 +35378,40 @@
         "title": "大陸の断片"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 184,
+        "name": "ダブルスティンガー"
+      },
+      {
+        "id": 185,
+        "name": "スティンガーフィンガー"
+      },
+      {
+        "id": 187,
+        "name": "スティンガーヘッジホッグ"
+      },
+      {
+        "id": 192,
+        "name": "ソーイングスティンガー"
+      },
+      {
+        "id": 193,
+        "name": "スティンガーステップ"
+      },
+      {
+        "id": 195,
+        "name": "シー・アーチン・スティンガー"
+      },
+      {
+        "id": 196,
+        "name": "トゲトゲ針治療"
+      },
+      {
+        "id": 197,
+        "name": "スティンガーフレイル"
+      }
+    ],
     "alias": "",
     "covers": [
       {
@@ -35207,7 +35444,16 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 162,
+        "name": "四百本猛打ノック"
+      },
+      {
+        "id": 163,
+        "name": "モグラ塚4番交差点"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -35231,7 +35477,32 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 156,
+        "name": "モグラ塚4番街"
+      },
+      {
+        "id": 158,
+        "name": "土竜平手打ち"
+      },
+      {
+        "id": 159,
+        "name": "土竜魚"
+      },
+      {
+        "id": 160,
+        "name": "モグラ塚ハイウェイ"
+      },
+      {
+        "id": 161,
+        "name": "モグモグ玉砕"
+      },
+      {
+        "id": 163,
+        "name": "モグラ塚4番交差点"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -41663,7 +41934,40 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 313,
+        "name": "氷河時代"
+      },
+      {
+        "id": 315,
+        "name": "アイスサーベル"
+      },
+      {
+        "id": 316,
+        "name": "アイスタイム"
+      },
+      {
+        "id": 405,
+        "name": "アイス塊 両棘矛"
+      },
+      {
+        "id": 406,
+        "name": "アイスタイムカプセル"
+      },
+      {
+        "id": 652,
+        "name": "アイスBALL"
+      },
+      {
+        "id": 654,
+        "name": "暴雉嘴"
+      },
+      {
+        "id": 1186,
+        "name": "氷拳"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -43800,7 +44104,176 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 329,
+        "name": "ストロング右"
+      },
+      {
+        "id": 330,
+        "name": "ウエポンズ左"
+      },
+      {
+        "id": 332,
+        "name": "風来砲"
+      },
+      {
+        "id": 358,
+        "name": "ストロングハンマー"
+      },
+      {
+        "id": 359,
+        "name": "フレッシュファイア"
+      },
+      {
+        "id": 363,
+        "name": "ホシ・シールド"
+      },
+      {
+        "id": 364,
+        "name": "マスターネイル"
+      },
+      {
+        "id": 365,
+        "name": "ビーンズレフト"
+      },
+      {
+        "id": 366,
+        "name": "アウチフィンガー"
+      },
+      {
+        "id": 367,
+        "name": "フランキー無敵"
+      },
+      {
+        "id": 368,
+        "name": "フランキーケンタウロス"
+      },
+      {
+        "id": 381,
+        "name": "アルティメットハンマー"
+      },
+      {
+        "id": 402,
+        "name": "風来噴射"
+      },
+      {
+        "id": 412,
+        "name": "フランキーBOXING"
+      },
+      {
+        "id": 415,
+        "name": "フランキートライアングルジャッカー"
+      },
+      {
+        "id": 419,
+        "name": "フランキーデストロイ砲"
+      },
+      {
+        "id": 421,
+        "name": "フランキーバタフライ"
+      },
+      {
+        "id": 513,
+        "name": "6億B・JACK POT"
+      },
+      {
+        "id": 519,
+        "name": "ヘビーヌンチャク"
+      },
+      {
+        "id": 554,
+        "name": "フランキー空中散歩"
+      },
+      {
+        "id": 555,
+        "name": "フラッパーゴング"
+      },
+      {
+        "id": 561,
+        "name": "迫撃砲"
+      },
+      {
+        "id": 658,
+        "name": "フランキーロケットランチャー"
+      },
+      {
+        "id": 664,
+        "name": "フランキーニップルライト"
+      },
+      {
+        "id": 684,
+        "name": "フランキー将軍"
+      },
+      {
+        "id": 685,
+        "name": "将軍足下危険"
+      },
+      {
+        "id": 686,
+        "name": "フランキー大砲"
+      },
+      {
+        "id": 701,
+        "name": "フランキーファイヤーボール"
+      },
+      {
+        "id": 718,
+        "name": "フランキーラディカルビーム"
+      },
+      {
+        "id": 767,
+        "name": "将軍の左"
+      },
+      {
+        "id": 768,
+        "name": "将軍大丈夫"
+      },
+      {
+        "id": 769,
+        "name": "将軍の盾"
+      },
+      {
+        "id": 770,
+        "name": "将軍の盾ブーメラン"
+      },
+      {
+        "id": 776,
+        "name": "将軍砲"
+      },
+      {
+        "id": 834,
+        "name": "将軍おもみ"
+      },
+      {
+        "id": 843,
+        "name": "フランキーサウスランドスープレックス"
+      },
+      {
+        "id": 844,
+        "name": "乳首ライト・スペシャル"
+      },
+      {
+        "id": 863,
+        "name": "フランキーヘアサロン"
+      },
+      {
+        "id": 907,
+        "name": "フランキーアイアンBOXING"
+      },
+      {
+        "id": 977,
+        "name": "フラの助アイアンスープレックス"
+      },
+      {
+        "id": 1065,
+        "name": "勝利のVフラッシュ"
+      },
+      {
+        "id": 1090,
+        "name": "将軍スープレックス"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -44635,7 +45108,20 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 638,
+        "name": "大噴火"
+      },
+      {
+        "id": 650,
+        "name": "流星火山"
+      },
+      {
+        "id": 656,
+        "name": "冥狗"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -45068,7 +45554,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 827,
+        "name": "角皿刀"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -45140,7 +45631,20 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 542,
+        "name": "前奏曲オフエル"
+      },
+      {
+        "id": 544,
+        "name": "革命舞曲ボンナバン"
+      },
+      {
+        "id": 545,
+        "name": "酒樽舞曲・ルミーズ"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -47923,7 +48427,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 967,
+        "name": "大頭目"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -48539,6 +49048,46 @@
         "id": 1164,
         "name": "震破",
         "reading": "ぐらっしゅ"
+      },
+      {
+        "id": 580,
+        "name": "反発"
+      },
+      {
+        "id": 1030,
+        "name": "磁気魔人"
+      },
+      {
+        "id": 1034,
+        "name": "磁気弦"
+      },
+      {
+        "id": 1053,
+        "name": "磁気万力"
+      },
+      {
+        "id": 1057,
+        "name": "破壊弦"
+      },
+      {
+        "id": 1073,
+        "name": "磁気ピストルズ"
+      },
+      {
+        "id": 1127,
+        "name": "付与"
+      },
+      {
+        "id": 1128,
+        "name": "磁気激突"
+      },
+      {
+        "id": 1143,
+        "name": "磁気大魔牛"
+      },
+      {
+        "id": 1148,
+        "name": "電磁砲"
       }
     ],
     "alias": "マーシャル・D・ティーチ",
@@ -48894,7 +49443,20 @@
         "title": "の扉絵"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1051,
+        "name": "斬首爪"
+      },
+      {
+        "id": 1058,
+        "name": "鎌阿音撃"
+      },
+      {
+        "id": 1121,
+        "name": "刃音撃"
+      }
+    ],
     "alias": "",
     "en_name": "Gan Fall",
     "arcs": [
@@ -49054,7 +49616,76 @@
         "title": "最終楽章"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 581,
+        "name": "ROOM"
+      },
+      {
+        "id": 582,
+        "name": "シャンブルズ"
+      },
+      {
+        "id": 732,
+        "name": "タクト"
+      },
+      {
+        "id": 733,
+        "name": "メス"
+      },
+      {
+        "id": 736,
+        "name": "カウンターショック"
+      },
+      {
+        "id": 806,
+        "name": "スキャン"
+      },
+      {
+        "id": 868,
+        "name": "ラジオナイフ"
+      },
+      {
+        "id": 869,
+        "name": "インジェクション ショット"
+      },
+      {
+        "id": 918,
+        "name": "ガンマナイフ"
+      },
+      {
+        "id": 921,
+        "name": "死の刀"
+      },
+      {
+        "id": 1074,
+        "name": "抗菌武装"
+      },
+      {
+        "id": 1124,
+        "name": "KROOM"
+      },
+      {
+        "id": 1125,
+        "name": "麻酔"
+      },
+      {
+        "id": 1126,
+        "name": "衝撃波動"
+      },
+      {
+        "id": 1147,
+        "name": "穿刺波動"
+      },
+      {
+        "id": 1149,
+        "name": "R・ROOM"
+      },
+      {
+        "id": 1166,
+        "name": "切断"
+      }
+    ],
     "alias": "",
     "en_name": "Pierre",
     "arcs": [
@@ -49605,7 +50236,24 @@
         "title": "最終楽章"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 586,
+        "name": "レーザー"
+      },
+      {
+        "id": 590,
+        "name": "八咫鏡"
+      },
+      {
+        "id": 597,
+        "name": "天叢雲剣"
+      },
+      {
+        "id": 637,
+        "name": "八尺瓊勾玉"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -52001,7 +52649,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 624,
+        "name": "赤魔鞭"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -60682,7 +61335,12 @@
         "title": "褒めてほしい"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 964,
+        "name": "レッグ・ベネディクト"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -60707,7 +61365,68 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 965,
+        "name": "天上の炎"
+      },
+      {
+        "id": 971,
+        "name": "雷霆"
+      },
+      {
+        "id": 974,
+        "name": "威国"
+      },
+      {
+        "id": 994,
+        "name": "皇帝剣波々刃"
+      },
+      {
+        "id": 1050,
+        "name": "天上のボンボン"
+      },
+      {
+        "id": 1059,
+        "name": "威鼓"
+      },
+      {
+        "id": 1060,
+        "name": "天満大自在天神"
+      },
+      {
+        "id": 1062,
+        "name": "刃母の炎"
+      },
+      {
+        "id": 1071,
+        "name": "覇海"
+      },
+      {
+        "id": 1076,
+        "name": "震御雷"
+      },
+      {
+        "id": 1079,
+        "name": "鳴光砲"
+      },
+      {
+        "id": 1122,
+        "name": "盗まれた火"
+      },
+      {
+        "id": 1123,
+        "name": "マーマ急襲"
+      },
+      {
+        "id": 1145,
+        "name": "鳴光剣"
+      },
+      {
+        "id": 1146,
+        "name": "三千里"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -60825,6 +61544,12 @@
     ],
     "group": [
       "オハラ"
+    ],
+    "abilities": [
+      {
+        "id": 1017,
+        "name": "熱息"
+      }
     ]
   },
   {
@@ -60894,7 +61619,36 @@
         "title": "人魚伝説"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 737,
+        "name": "ガスローブ"
+      },
+      {
+        "id": 739,
+        "name": "ガスタネット"
+      },
+      {
+        "id": 741,
+        "name": "燃焼系ミオークGAS"
+      },
+      {
+        "id": 742,
+        "name": "無空世界"
+      },
+      {
+        "id": 743,
+        "name": "青炎剣"
+      },
+      {
+        "id": 763,
+        "name": "ガスティーユ"
+      },
+      {
+        "id": 945,
+        "name": "ROKO"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -62270,7 +63024,20 @@
     "birthday": "",
     "firstAppearance": "",
     "appearances": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 841,
+        "name": "抜け雀"
+      },
+      {
+        "id": 943,
+        "name": "昇り竜"
+      },
+      {
+        "id": 1031,
+        "name": "墨雲 浮世夕立ち絵図"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -62447,7 +63214,28 @@
         "title": "影の集合地"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 886,
+        "name": "目の突枯"
+      },
+      {
+        "id": 887,
+        "name": "型氷"
+      },
+      {
+        "id": 888,
+        "name": "不死武士の痛巳"
+      },
+      {
+        "id": 890,
+        "name": "Gの刻印"
+      },
+      {
+        "id": 891,
+        "name": "戦闘保拳"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -62471,7 +63259,20 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 830,
+        "name": "10tヴァイス"
+      },
+      {
+        "id": 882,
+        "name": "万tヴァイス"
+      },
+      {
+        "id": 883,
+        "name": "千tヴァイス"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -62495,7 +63296,24 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 789,
+        "name": "熱鉄の涙"
+      },
+      {
+        "id": 790,
+        "name": "目鯨"
+      },
+      {
+        "id": 798,
+        "name": "心覗き"
+      },
+      {
+        "id": 804,
+        "name": "千里眼"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -62840,7 +63658,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 787,
+        "name": "キングパンチ"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -63214,7 +64037,24 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 785,
+        "name": "青い鳥"
+      },
+      {
+        "id": 833,
+        "name": "斬・星屑王子"
+      },
+      {
+        "id": 855,
+        "name": "円卓"
+      },
+      {
+        "id": 924,
+        "name": "金の斧銀の斧"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -63558,7 +64398,16 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 859,
+        "name": "隕石(名前未確定)"
+      },
+      {
+        "id": 862,
+        "name": "重力刀 猛虎"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -64802,7 +65651,12 @@
         "title": "の扉絵"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 783,
+        "name": "四千枚瓦正拳"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -66339,6 +67193,14 @@
         "id": 587,
         "name": "降魔の相",
         "reading": "ごうまのそう"
+      },
+      {
+        "id": 857,
+        "name": "ジェットウォーク"
+      },
+      {
+        "id": 911,
+        "name": "雷の破壊剣"
       }
     ],
     "alias": "",
@@ -69203,7 +70065,12 @@
         "title": "イーダの息子"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1202,
+        "name": "彼岸刃鉈"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -69858,7 +70725,16 @@
     "birthday": "",
     "firstAppearance": "",
     "appearances": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 874,
+        "name": "サイレント"
+      },
+      {
+        "id": 875,
+        "name": "凪"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -71847,7 +72723,16 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 970,
+        "name": "混色バグ"
+      },
+      {
+        "id": 1004,
+        "name": "巻力断頭"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -71901,7 +72786,12 @@
         "title": "の扉絵"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1006,
+        "name": "桃色毒矢"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -72150,7 +73040,16 @@
         "title": "海侠のジンベエ"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 952,
+        "name": "反射"
+      },
+      {
+        "id": 953,
+        "name": "鏡世界"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -73108,7 +74007,12 @@
         "title": "落とし前"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 990,
+        "name": "スローワルツ"
+      }
+    ],
     "alias": "",
     "en_name": "Shilliew",
     "arcs": [
@@ -75087,7 +75991,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 339,
+        "name": "月歩"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -75183,7 +76092,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1067,
+        "name": "怒髪光拝"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -76003,7 +76917,12 @@
         "title": "ドフラミンゴ現る"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1043,
+        "name": "残雪鎌"
+      }
+    ],
     "alias": "チャドロス・ヒゲリゲス(茶ひげ)",
     "en_name": "",
     "arcs": [
@@ -76595,7 +77514,12 @@
         "title": "ビッグニュース"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1029,
+        "name": "桃源十拳"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -76695,7 +77619,32 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1109,
+        "name": "炎皇"
+      },
+      {
+        "id": 1117,
+        "name": "丹弓皇"
+      },
+      {
+        "id": 1129,
+        "name": "貂自尊皇"
+      },
+      {
+        "id": 1130,
+        "name": "刃裏双皇"
+      },
+      {
+        "id": 1137,
+        "name": "御守火龍皇"
+      },
+      {
+        "id": 1138,
+        "name": "火龍皇"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -76862,7 +77811,36 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1020,
+        "name": "無頼男爆弾"
+      },
+      {
+        "id": 1080,
+        "name": "ブラック光火"
+      },
+      {
+        "id": 1110,
+        "name": "ブライダル熱拳"
+      },
+      {
+        "id": 1119,
+        "name": "風来拳"
+      },
+      {
+        "id": 1132,
+        "name": "巻力QUEEN"
+      },
+      {
+        "id": 1133,
+        "name": "火花QUEEN"
+      },
+      {
+        "id": 1134,
+        "name": "起電QUEEN"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -77490,7 +78468,12 @@
     "firstAppearance": "",
     "appearances": [],
     "covers": [],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 1029,
+        "name": "桃源十拳"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
@@ -79791,6 +80774,14 @@
         "id": 673,
         "name": "ウルトラマリン",
         "reading": "うるとらまりん"
+      },
+      {
+        "id": 1161,
+        "name": "禁憎森々"
+      },
+      {
+        "id": 1162,
+        "name": "防火林"
       }
     ],
     "alias": "",
@@ -80697,7 +81688,20 @@
         "title": "タイヨウへと続く道"
       }
     ],
-    "abilities": [],
+    "abilities": [
+      {
+        "id": 576,
+        "name": "熊の衝撃"
+      },
+      {
+        "id": 598,
+        "name": "メロメロ甘風"
+      },
+      {
+        "id": 640,
+        "name": "芳香脚"
+      }
+    ],
     "alias": "",
     "en_name": "",
     "arcs": [
