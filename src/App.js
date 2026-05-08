@@ -6,6 +6,7 @@ import mangaAnimeMap from "./data/manga_anime_map.json";
 import netflixIds from "./data/netflix_ids.json";
 import organizationMaster from "./data/organization_master.json";
 import updatesData from "./data/updates.json";
+import kindleAsins from "./data/kindle_asins.json";
 const CHARACTERS = [...charactersData].sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0));
 const LOCATIONS = [...locationsData];
 const SKILLS = skillsData;
@@ -129,10 +130,15 @@ const getEpisodeLinkLabel = (episodeNum) => {
 };
 
 /**
- * type: 'mono' | 'color' — ASIN は使わず、Kindle ストア検索 URL のみ生成
+ * type: 'mono' | 'color' — ASIN がある場合は商品ページ直リンク、無ければ検索 URL にフォールバック
  */
 const getKindleUrl = (episode, type) => {
   const vol = getVolumeFromEpisode(episode);
+  const bucket = type === "color" ? kindleAsins?.color : kindleAsins?.mono;
+  const asin = bucket && bucket[String(vol)];
+  if (asin) {
+    return `https://www.amazon.co.jp/dp/${asin}`;
+  }
   const query =
     type === "color"
       ? `ONE PIECE カラー版 ${vol}`
