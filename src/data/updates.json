@@ -1,12 +1,12 @@
 [
   {
     "date": "2026-05-07",
-    "content": "<div class='update-header'>技情報を更新</div><div class='update-group'><div class='update-char'>■ ゴール・Ｄ・ロジャー</div><ul class='update-list'><li>荒御魂（アラミタマ）</li><li>火之迦具土慧士（ヒノカグツチノエイス）</li></ul><div class='update-char'>■ シルバーズ・レイリー</div><ul class='update-list'><li>彼岸刃鉈（ヒガンバナ）</li></ul><div class='update-char'>■ モンキー・Ｄ・ガープ</div><ul class='update-list'><li>拳骨衝突（ギャラクシーインパクト）</li><li>拳骨流星群（ゲンコツりゅうせいぐん）</li><li>無限拳骨（インフィニトゥムエクスプロージョン）</li><li>海賊火の玉（カイゾクヒノタマ）</li></ul><div class='update-char'>■ ロキ</div><ul class='update-list'><li>原初世界（ニブルヘイム）</li><li>雷界（トールヘイム）</li><li>鉄雷一槌（ラグナイヅチ）</li></ul></div>",
+    "content": "<div class='update-header'>技情報を更新</div><div class='update-group'><div class='update-char'>■ ゴール・Ｄ・ロジャー</div><ul class='update-list'><li>荒御魂（アラミタマ）</li><li>火之迦具土慧士（ヒノカグツチノエイス）</li></ul><div class='update-char'>■ シルバーズ・レイリー</div><ul class='update-list'><li>彼岸刃鉈（ヒガンバナ）</li></ul><div class='update-char'>■ モンキー・Ｄ・ガープ</div><ul class='update-list'><li>拳骨衝突（ギャラクシーインパクト）</li><li>拳骨流星群（ゲンコツリュウセイグン）</li><li>無限拳骨（インフィニトゥムエクスプロージョン）</li><li>海賊火の玉（カイゾクヒノタマ）</li></ul><div class='update-char'>■ ロキ</div><ul class='update-list'><li>原初世界（ニブルヘイム）</li><li>雷界（トールヘイム）</li><li>鉄雷一槌（ラグナイヅチ）</li></ul></div>",
     "type": "update"
   },
   {
     "date": "2026-05-06",
-    "content": "GRAND LINE DATABASE を正式公開",
+    "content": "GRAND LINE DATABASE を公開 ー冒険の夜明けー",
     "type": "release"
   }
 ]
