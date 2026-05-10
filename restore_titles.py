@@ -9,6 +9,15 @@ CHAR_PATH = ROOT / "src/data/characters.json"
 MAP_PATH = ROOT / "src/data/manga_anime_map.json"
 
 
+def _is_broken_cover_placeholder_title(title: str) -> bool:
+    """
+    扉絵行は「{章題}の扉絵」と格納されるが、章題欠落で「の扉絵」だけになることがある。
+    restore が最長タイトル優先のため、本話タイトルよりこちらが選ばれ manga_anime_map を汚すので除外する。
+    （「一刻も早く死ななくてはの扉絵」のような正しい長い扉絵タイトルはそのまま採用する。）
+    """
+    return (title or "").strip() == "の扉絵"
+
+
 def rescue_titles() -> None:
     with CHAR_PATH.open(encoding="utf-8") as f:
         chars = json.load(f)
@@ -25,6 +34,8 @@ def rescue_titles() -> None:
             title = (app.get("title") or "").strip()
             if ep > 1114 or not title or "タイトル未設定" in title:
                 continue
+            if _is_broken_cover_placeholder_title(title):
+                continue
             if ep not in captured_titles or len(title) > len(captured_titles[ep]):
                 captured_titles[ep] = title
 
@@ -40,7 +51,15 @@ def rescue_titles() -> None:
                 entry = {"ep": entry} if entry is not None else {}
                 manga_map[s_ep] = entry
             current_title = (entry.get("title") or "").strip()
-            if (not current_title or "タイトル" in current_title) and ep_num in captured_titles:
+            needs_restore = (
+                ep_num in captured_titles
+                and (
+                    not current_title
+                    or "タイトル" in current_title
+                    or _is_broken_cover_placeholder_title(current_title)
+                )
+            )
+            if needs_restore:
                 entry["title"] = captured_titles[ep_num]
                 restore_count += 1
         elif ep_num in captured_titles:
