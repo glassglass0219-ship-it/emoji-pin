@@ -863,6 +863,100 @@ body {
   margin-top: 2px;
 }
 
+/* ─── Detail: English name (compact & refined) ─── */
+.detail-name-english {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 4px 14px 4px 12px;
+  background: linear-gradient(90deg, rgba(196, 30, 58, 0.06), rgba(196, 30, 58, 0));
+  border-left: 2px solid var(--red-main);
+  border-radius: 0 6px 6px 0;
+  max-width: 100%;
+}
+
+.detail-name-english-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--red-main);
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+  border: 1px solid rgba(196, 30, 58, 0.35);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.detail-name-english-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: var(--text-main);
+  line-height: 1.2;
+  font-weight: 400;
+  word-break: break-word;
+}
+
+/* ─── Detail: Affiliation chips (organization / group) ─── */
+.detail-affiliations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.detail-aff-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 12px 3px 3px;
+  box-shadow: 0 1px 4px rgba(45, 31, 20, 0.04);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.detail-aff-chip:hover {
+  border-color: var(--red-main);
+  box-shadow: 0 2px 10px rgba(196, 30, 58, 0.10);
+  transform: translateY(-1px);
+}
+
+.detail-aff-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: #fff;
+  background: var(--text-main);
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.detail-aff-chip--group .detail-aff-label {
+  background: var(--red-main);
+}
+
+.detail-aff-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .detail-info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2115,36 +2209,37 @@ function DetailPanel({ char, onClose }) {
           ) : null}
           <div className="detail-name">{char.name}</div>
           <div className="detail-name-en">{char.reading}</div>
-          <div className="detail-info-grid">
-            <div className="info-item">
-              <div className="info-label">組織</div>
-              <div className="info-value">{`[${
-                Array.isArray(char.category) ? (char.category.length ? char.category.join(" / ") : "—") : (char.category || "—")
-              }] / ${
-                Array.isArray(char.group) ? (char.group.length ? char.group.join(" / ") : "—") : (char.group || "—")
-              }`}</div>
+          {String(char.en_name ?? "").trim() ? (
+            <div className="detail-name-english" aria-label="English name">
+              <span className="detail-name-english-label">EN</span>
+              <span className="detail-name-english-text">{String(char.en_name).trim()}</span>
             </div>
-            <div className="info-item">
-              <div className="info-label">懸賞金</div>
-              <div className="info-value highlight">{char.bounty || "—"}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">悪魔の実</div>
-              <div className="info-value">{char.devilFruit || "—"}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">初登場</div>
-              <div className="info-value">第{char.firstAppearance}話</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">誕生日</div>
-              <div className="info-value">{char.birthday || "—"}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">性別</div>
-              <div className="info-value">{char.gender || "—"}</div>
-            </div>
-          </div>
+          ) : null}
+          {(() => {
+            const cats = Array.isArray(char.category)
+              ? char.category.filter(Boolean)
+              : (char.category ? [char.category] : []);
+            const grps = Array.isArray(char.group)
+              ? char.group.filter(Boolean)
+              : (char.group ? [char.group] : []);
+            if (cats.length === 0 && grps.length === 0) return null;
+            return (
+              <div className="detail-affiliations">
+                {cats.length > 0 && (
+                  <span className="detail-aff-chip detail-aff-chip--category">
+                    <span className="detail-aff-label">所属</span>
+                    <span className="detail-aff-value">{cats.join(" / ")}</span>
+                  </span>
+                )}
+                {grps.length > 0 && (
+                  <span className="detail-aff-chip detail-aff-chip--group">
+                    <span className="detail-aff-label">団体</span>
+                    <span className="detail-aff-value">{grps.join(" / ")}</span>
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="detail-tabs">
@@ -2398,13 +2493,15 @@ export default function App() {
   }, [locationSearch]);
 
   const filteredChars = useMemo(() => {
+    const searchLower = search ? search.toLowerCase() : "";
     return CHARACTERS.filter((c) => {
       const matchSearch =
         !search ||
         c.name.includes(search) ||
         (c.reading || "").includes(search) ||
         (c.alias || "").includes(search) ||
-        (c.devilFruit || "").includes(search);
+        (c.devilFruit || "").includes(search) ||
+        (c.en_name || "").toLowerCase().includes(searchLower);
       const charCategories = Array.isArray(c.category) ? c.category : (c.category ? [c.category] : []);
       const matchOrgCategory = orgCategoryFilter === "all" || charCategories.includes(orgCategoryFilter);
       const charGroups = Array.isArray(c.group) ? c.group : (c.group ? [c.group] : []);
