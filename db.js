@@ -25,6 +25,9 @@ async function initDb() {
       t.increments('id').primary();
       t.string('teamId').notNullable().defaultTo(DEFAULT_TEAM_ID);
       t.string('userId').notNullable();
+      t.string('itemUser');
+      t.string('userIcon');
+      t.string('user_icon');
       t.string('messageTs').notNullable();
       t.string('channelId').notNullable();
       t.text('text');
@@ -38,6 +41,18 @@ async function initDb() {
 
   await ensureColumn('tasks', 'teamId', (t) => {
     t.string('teamId').notNullable().defaultTo(DEFAULT_TEAM_ID);
+  });
+
+  await ensureColumn('tasks', 'itemUser', (t) => {
+    t.string('itemUser');
+  });
+
+  await ensureColumn('tasks', 'userIcon', (t) => {
+    t.string('userIcon');
+  });
+
+  await ensureColumn('tasks', 'user_icon', (t) => {
+    t.string('user_icon');
   });
 
   const hasFolderColumn = await knex.schema.hasColumn('tasks', 'folder');
@@ -127,14 +142,15 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
   return row;
 }
 
-async function saveTask({ teamId = DEFAULT_TEAM_ID, userId, messageTs, channelId, text, emoji, category }) {
+async function saveTask({ teamId = DEFAULT_TEAM_ID, userId, itemUser, userIcon, user_icon, messageTs, channelId, text, emoji, category }) {
+  const iconUrl = user_icon || userIcon || null;
   const existing = await knex('tasks').where({ teamId, userId, messageTs, channelId, category }).first();
   if (existing) {
-    await knex('tasks').where({ id: existing.id }).update({ text, emoji, status: 'pending' });
+    await knex('tasks').where({ id: existing.id }).update({ text, emoji, itemUser, user_icon: iconUrl, status: 'pending' });
     return knex('tasks').where({ id: existing.id }).first();
   }
 
-  const [id] = await knex('tasks').insert({ teamId, userId, messageTs, channelId, text, emoji, category });
+  const [id] = await knex('tasks').insert({ teamId, userId, itemUser, user_icon: iconUrl, messageTs, channelId, text, emoji, category });
   return knex('tasks').where({ id }).first();
 }
 
@@ -168,6 +184,14 @@ async function reopenTask(userId, taskId, category, teamId = DEFAULT_TEAM_ID) {
       folder: nextCategory === 'INFO' ? '未分類' : '未分類',
     });
   return knex('tasks').where({ id: taskId, userId, teamId }).first();
+}
+
+async function deleteTask(userId, taskId, teamId = DEFAULT_TEAM_ID) {
+  return knex('tasks').where({ id: taskId, userId, teamId }).delete();
+}
+
+async function deleteCompletedTasks(userId, teamId = DEFAULT_TEAM_ID) {
+  return knex('tasks').where({ userId, teamId, status: 'completed' }).delete();
 }
 
 async function getFolders(userId, teamId = DEFAULT_TEAM_ID) {
@@ -267,6 +291,8 @@ module.exports = {
   getPendingTasks,
   getHomeTasks,
   reopenTask,
+  deleteTask,
+  deleteCompletedTasks,
   getFolders,
   replaceFolders,
   updateTaskFolder,

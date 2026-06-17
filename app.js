@@ -9,6 +9,8 @@ const {
   getPendingTasks,
   getHomeTasks,
   reopenTask,
+  deleteTask,
+  deleteCompletedTasks,
   getFolders,
   replaceFolders,
   updateTaskFolder,
@@ -48,6 +50,7 @@ const REQUIRED_BOT_SCOPES = [
   'chat:write',
   'im:write',
   'reactions:read',
+  'users:read',
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
@@ -84,32 +87,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       : infoItems.filter((t) => (t.folder || '未分類') === safeSelectedFolder);
   const visibleItems = isDoneTab ? doneItems : isInfoTab ? filteredInfoItems : checkingItems;
   const limitedItems = visibleItems.slice(0, HOME_ITEM_LIMIT);
-  const selectedLabel = isDoneTab ? '✅ DONE' : isInfoTab ? '📖 資料' : '👀 確認中';
-
   const blocks = [
-    {
-      type: 'header',
-      text: { type: 'plain_text', text: APP_NAME, emoji: true },
-    },
-    {
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: 'Manage your pinned items with elegance.',
-        },
-      ],
-    },
-    {
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: '⚙️ 設定', emoji: true },
-          action_id: 'open_settings_modal',
-        },
-      ],
-    },
     {
       type: 'actions',
       elements: [
@@ -133,6 +111,12 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           action_id: 'switch_tab_done',
           value: 'done',
           ...(isDoneTab ? { style: 'primary' } : {}),
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '⚙️ 設定', emoji: true },
+          value: 'settings',
+          action_id: 'open_settings_modal',
         },
       ],
     },
@@ -166,14 +150,31 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     blocks.push({ type: 'divider' });
   }
 
-  const renderItems = (items, label, totalCount) => {
+  if (isDoneTab && doneItems.length > 0) {
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '💥 DONEを一括削除', emoji: true },
+          style: 'danger',
+          action_id: 'clear_all_done',
+          value: 'done',
+          confirm: {
+            title: { type: 'plain_text', text: '本当によろしいですか？' },
+            text: { type: 'plain_text', text: 'DONEに入っているすべてのアイテムを完全に削除します。' },
+            confirm: { type: 'plain_text', text: '削除する' },
+            deny: { type: 'plain_text', text: 'キャンセル' },
+          },
+        },
+      ],
+    });
+    blocks.push({ type: 'divider' });
+  }
+
+  const renderItems = (items, totalCount) => {
     if (items.length === 0) return [];
-    const section = [
-      {
-        type: 'section',
-        text: { type: 'mrkdwn', text: `*${label}*` },
-      },
-    ];
+    const section = [];
     const spacerBlock = {
       type: 'section',
       text: { type: 'mrkdwn', text: '\u200B' },
@@ -191,6 +192,20 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       if (index > 0) section.push(spacerBlock);
       section.push({ type: 'divider' });
       section.push(spacerBlock);
+      section.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'image',
+            image_url: t.user_icon || t.userIcon || 'https://api.slack.com/img/blocks/base/plants/plant1.png',
+            alt_text: 'user_icon',
+          },
+          {
+            type: 'mrkdwn',
+            text: `*<@${t.itemUser || t.userId}>*`,
+          },
+        ],
+      });
       section.push({
         type: 'section',
         text: {
@@ -220,6 +235,13 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
             type: 'button',
             text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
             action_id: 'reopen_to_info',
+            value: JSON.stringify({ taskId: t.id }),
+          },
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+            style: 'danger',
+            action_id: 'delete_item',
             value: JSON.stringify({ taskId: t.id }),
           }
         );
@@ -258,7 +280,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     return section;
   };
 
-  blocks.push(...renderItems(limitedItems, selectedLabel, visibleItems.length));
+  blocks.push(...renderItems(limitedItems, visibleItems.length));
 
   if (visibleItems.length === 0) {
     const emptyLabel = isDoneTab ? 'DONEアイテム' : isInfoTab ? '資料' : '確認中アイテム';
@@ -305,6 +327,17 @@ async function publishHomeView(client, userId, tasks, selectedTab = 'checking', 
 async function getDmChannel(client, userId) {
   const res = await client.conversations.open({ users: userId });
   return res.channel.id;
+}
+
+async function getUserIcon(client, userId) {
+  if (!userId) return null;
+  try {
+    const res = await client.users.info({ user: userId });
+    return res.user?.profile?.image_48 || res.user?.profile?.image_72 || null;
+  } catch (error) {
+    console.warn(`[${APP_NAME}] ユーザーアイコンを取得できませんでした (${userId}): ${getSlackErrorCode(error)}`);
+    return null;
+  }
 }
 
 function getSlackErrorCode(error) {
@@ -581,6 +614,28 @@ app.action(/^(reopen_to_checking|reopen_to_info)$/, async ({ body, action, clien
   await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
 });
 
+app.action('delete_item', async ({ body, action, client, ack }) => {
+  await ack();
+  const teamId = getTeamId(body);
+  const parsedAction = parseCompleteTaskActionValue(action.value || body.actions?.[0]?.value);
+  if (!parsedAction) {
+    console.warn(`[${APP_NAME}] 削除ボタンのvalueからtaskIdを取得できませんでした: ${action.value}`);
+    return;
+  }
+
+  await deleteTask(body.user.id, parsedAction.taskId, teamId);
+  const tasks = await getHomeTasks(body.user.id, teamId);
+  await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
+});
+
+app.action('clear_all_done', async ({ body, client, ack }) => {
+  await ack();
+  const teamId = getTeamId(body);
+  await deleteCompletedTasks(body.user.id, teamId);
+  const tasks = await getHomeTasks(body.user.id, teamId);
+  await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
+});
+
 // ─── 環境設定モーダル ────────────────────────────────────────────────────────
 
 app.action('open_settings_modal', async ({ body, client, ack }) => {
@@ -835,9 +890,13 @@ app.event('reaction_added', async ({ event, body, client }) => {
     if (!category) return;
 
     const text = await getMessageText(client, item.channel, item.ts);
+    const itemUser = event.item_user || user;
+    const userIcon = await getUserIcon(client, itemUser);
     const task = await saveTask({
       teamId,
       userId: user,
+      itemUser,
+      user_icon: userIcon,
       messageTs: item.ts,
       channelId: item.channel,
       text,
