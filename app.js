@@ -19,26 +19,12 @@ const {
   getUserIdsForReminderHour,
   countPendingCheckingTasks,
   getAllUserIdsWithPendingOldTasks,
+  storeInstallation,
+  fetchInstallation,
+  deleteInstallation,
+  getInstallationBotToken,
+  getInstallationBotTokens,
 } = require('./db');
-
-// Slack の Event Subscriptions URL 検証 (url_verification) を確実に通すため、
-// ExpressReceiver を明示的に使い、/slack/events への challenge 応答を先に返す。
-const receiver = new ExpressReceiver({
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  endpoints: '/slack/events',
-});
-
-receiver.router.post('/slack/events', (req, res, next) => {
-  if (req.body?.type === 'url_verification' && typeof req.body?.challenge === 'string') {
-    return res.status(200).send(req.body.challenge);
-  }
-  return next();
-});
-
-const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  receiver,
-});
 
 const APP_NAME = 'Emoji Pin';
 const SLACK_APP_ID = process.env.SLACK_APP_ID;
@@ -54,6 +40,38 @@ const REQUIRED_BOT_SCOPES = [
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
+
+// Slack の Event Subscriptions URL 検証 (url_verification) を確実に通すため、
+// ExpressReceiver を明示的に使い、/slack/events への challenge 応答を先に返す。
+const receiver = new ExpressReceiver({
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  clientId: process.env.SLACK_CLIENT_ID,
+  clientSecret: process.env.SLACK_CLIENT_SECRET,
+  stateSecret: process.env.SLACK_STATE_SECRET,
+  scopes: REQUIRED_BOT_SCOPES,
+  installationStore: {
+    storeInstallation,
+    fetchInstallation,
+    deleteInstallation,
+  },
+  installerOptions: {
+    installPath: '/slack/install',
+    redirectUriPath: '/slack/oauth_redirect',
+  },
+  endpoints: '/slack/events',
+});
+
+receiver.router.post('/slack/events', (req, res, next) => {
+  if (req.body?.type === 'url_verification' && typeof req.body?.challenge === 'string') {
+    return res.status(200).send(req.body.challenge);
+  }
+  return next();
+});
+
+const app = new App({
+  socketMode: false,
+  receiver,
+});
 
 function getAppHomeButton() {
   return {
@@ -324,8 +342,12 @@ async function publishHomeView(client, userId, tasks, selectedTab = 'checking', 
   });
 }
 
-async function getDmChannel(client, userId) {
-  const res = await client.conversations.open({ users: userId });
+function withBotToken(args, botToken) {
+  return botToken ? { ...args, token: botToken } : args;
+}
+
+async function getDmChannel(client, userId, botToken) {
+  const res = await client.conversations.open(withBotToken({ users: userId }, botToken));
   return res.channel.id;
 }
 
@@ -358,9 +380,9 @@ function logPermissionHint(action, error, scopes) {
   }
 }
 
-async function ensureJoinedChannel(client, channelId) {
+async function ensureJoinedChannel(client, channelId, botToken) {
   try {
-    await client.conversations.join({ channel: channelId });
+    await client.conversations.join(withBotToken({ channel: channelId }, botToken));
     return true;
   } catch (error) {
     const code = getSlackErrorCode(error);
@@ -410,21 +432,21 @@ async function getMessageText(client, channelId, messageTs) {
   }
 }
 
-async function verifyInstallReadiness(client) {
+async function verifyInstallReadiness(client, botToken) {
   console.log(`[${APP_NAME}] 推奨Bot OAuthスコープ: ${REQUIRED_BOT_SCOPES.join(', ')}`);
 
   try {
-    await client.conversations.list({
+    await client.conversations.list(withBotToken({
       types: 'public_channel',
       exclude_archived: true,
       limit: 1,
-    });
+    }, botToken));
   } catch (error) {
     logPermissionHint('パブリックチャンネル一覧取得', error, ['channels:read']);
   }
 }
 
-async function joinAllPublicChannels(client) {
+async function joinAllPublicChannels(client, botToken) {
   if (!AUTO_JOIN_PUBLIC_CHANNELS) {
     console.log(`[${APP_NAME}] AUTO_JOIN_PUBLIC_CHANNELS=false のため、起動時の自動参加をスキップします。`);
     return;
@@ -436,12 +458,12 @@ async function joinAllPublicChannels(client) {
 
   try {
     do {
-      const response = await client.conversations.list({
+      const response = await client.conversations.list(withBotToken({
         types: 'public_channel',
         exclude_archived: true,
         limit: 200,
         cursor,
-      });
+      }, botToken));
 
       for (const channel of response.channels || []) {
         if (channel.is_member) {
@@ -449,7 +471,7 @@ async function joinAllPublicChannels(client) {
           continue;
         }
 
-        const joined = await ensureJoinedChannel(client, channel.id);
+        const joined = await ensureJoinedChannel(client, channel.id, botToken);
         if (joined) joinedCount += 1;
         else skippedCount += 1;
       }
@@ -920,8 +942,15 @@ cron.schedule('0 * * * *', async () => {
       const count = await countPendingCheckingTasks(userId, teamId);
       if (count === 0) continue;
 
-      const dmChannel = await getDmChannel(app.client, userId);
+      const botToken = await getInstallationBotToken(teamId);
+      if (!botToken) {
+        console.warn(`[${APP_NAME}] インストール情報がないためリマインドをスキップしました: team=${teamId}`);
+        continue;
+      }
+
+      const dmChannel = await getDmChannel(app.client, userId, botToken);
       await app.client.chat.postMessage({
+        token: botToken,
         channel: dmChannel,
         text: `${APP_NAME}: 確認中のタスクが ${count} 件あります。`,
         blocks: [
@@ -954,7 +983,13 @@ cron.schedule('0 9 * * *', async () => {
       );
       if (old.length === 0) continue;
 
-      const dmChannel = await getDmChannel(app.client, userId);
+      const botToken = await getInstallationBotToken(teamId);
+      if (!botToken) {
+        console.warn(`[${APP_NAME}] インストール情報がないため24時間リマインドをスキップしました: team=${teamId}`);
+        continue;
+      }
+
+      const dmChannel = await getDmChannel(app.client, userId, botToken);
       const lines = old
         .map((t) => {
           const link = `https://slack.com/archives/${t.channelId}/p${t.messageTs.replace('.', '')}`;
@@ -964,6 +999,7 @@ cron.schedule('0 9 * * *', async () => {
         .join('\n');
 
       await app.client.chat.postMessage({
+        token: botToken,
         channel: dmChannel,
         text: `📣 *${APP_NAME} リマインド*: 24時間以上経過した未完了アイテムが ${old.length} 件あります！\n${lines}`,
       });
@@ -977,10 +1013,17 @@ cron.schedule('0 9 * * *', async () => {
 
 (async () => {
   await initDb();
-  await verifyInstallReadiness(app.client);
   await app.start(process.env.PORT || 3000);
   console.log(`⚡️ ${APP_NAME} Slack app is running!`);
-  joinAllPublicChannels(app.client).catch((error) => {
-    console.error(`[${APP_NAME}] 起動時のチャンネル自動参加で予期しないエラーが発生しました:`, error);
-  });
+  console.log(`[${APP_NAME}] インストールURL: /slack/install`);
+
+  const installations = await getInstallationBotTokens();
+  for (const { teamId, botToken } of installations) {
+    verifyInstallReadiness(app.client, botToken).catch((error) => {
+      console.error(`[${APP_NAME}] 起動時の権限確認で予期しないエラーが発生しました (${teamId}):`, error);
+    });
+    joinAllPublicChannels(app.client, botToken).catch((error) => {
+      console.error(`[${APP_NAME}] 起動時のチャンネル自動参加で予期しないエラーが発生しました (${teamId}):`, error);
+    });
+  }
 })();

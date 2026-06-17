@@ -17,6 +17,27 @@ async function ensureColumn(tableName, columnName, addColumn) {
 }
 
 async function initDb() {
+  const hasInstallations = await knex.schema.hasTable('installations');
+  if (!hasInstallations) {
+    await knex.schema.createTable('installations', (t) => {
+      t.string('team_id').primary();
+      t.string('enterprise_id');
+      t.jsonb('data').notNullable();
+    });
+  }
+
+  await ensureColumn('installations', 'team_id', (t) => {
+    t.string('team_id');
+  });
+
+  await ensureColumn('installations', 'enterprise_id', (t) => {
+    t.string('enterprise_id');
+  });
+
+  await ensureColumn('installations', 'data', (t) => {
+    t.jsonb('data');
+  });
+
   const hasTasks = await knex.schema.hasTable('tasks');
   if (!hasTasks) {
     await knex.schema.createTable('tasks', (t) => {
@@ -119,6 +140,69 @@ async function initDb() {
 
 }
 
+function getInstallationTeamId(query = {}) {
+  const teamId = query.teamId || query.team?.id || query.team_id || null;
+  const enterpriseId = query.enterpriseId || query.enterprise?.id || query.enterprise_id || null;
+
+  if (teamId) return teamId;
+  if (enterpriseId) return enterpriseId;
+
+  throw new Error('Slack installation is missing teamId or enterpriseId.');
+}
+
+function parseInstallationData(data) {
+  return typeof data === 'string' ? JSON.parse(data) : data;
+}
+
+async function storeInstallation(installation) {
+  const teamId = getInstallationTeamId(installation);
+  const row = {
+    team_id: teamId,
+    enterprise_id: installation.enterprise?.id || null,
+    data: installation,
+  };
+
+  await knex('installations')
+    .insert(row)
+    .onConflict('team_id')
+    .merge({
+      enterprise_id: row.enterprise_id,
+      data: row.data,
+    });
+}
+
+async function fetchInstallation(installQuery) {
+  const teamId = getInstallationTeamId(installQuery);
+  const row = await knex('installations').where({ team_id: teamId }).first();
+  if (!row) {
+    throw new Error(`Slack installation not found: ${teamId}`);
+  }
+
+  return parseInstallationData(row.data);
+}
+
+async function deleteInstallation(installQuery) {
+  const teamId = getInstallationTeamId(installQuery);
+  await knex('installations').where({ team_id: teamId }).delete();
+}
+
+async function getInstallationBotToken(teamId) {
+  if (!teamId) return null;
+  const row = await knex('installations').where({ team_id: teamId }).first();
+  const installation = row ? parseInstallationData(row.data) : null;
+  return installation?.bot?.token || null;
+}
+
+async function getInstallationBotTokens() {
+  const rows = await knex('installations').select('team_id as teamId', 'data');
+  return rows
+    .map((row) => {
+      const installation = parseInstallationData(row.data);
+      return { teamId: row.teamId, botToken: installation?.bot?.token || null };
+    })
+    .filter((row) => row.botToken);
+}
+
 async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
   let row = await knex('settings').where({ userId, teamId }).first();
   if (!row && teamId !== DEFAULT_TEAM_ID) {
@@ -148,7 +232,10 @@ async function saveTask({ teamId = DEFAULT_TEAM_ID, userId, itemUser, userIcon, 
     return knex('tasks').where({ id: existing.id }).first();
   }
 
-  const [id] = await knex('tasks').insert({ teamId, userId, itemUser, user_icon: iconUrl, messageTs, channelId, text, emoji, category });
+  const [inserted] = await knex('tasks')
+    .insert({ teamId, userId, itemUser, user_icon: iconUrl, messageTs, channelId, text, emoji, category })
+    .returning('id');
+  const id = typeof inserted === 'object' ? inserted.id : inserted;
   return knex('tasks').where({ id }).first();
 }
 
@@ -283,6 +370,11 @@ async function getAllUserIdsWithPendingOldTasks(hours) {
 module.exports = {
   knex,
   initDb,
+  storeInstallation,
+  fetchInstallation,
+  deleteInstallation,
+  getInstallationBotToken,
+  getInstallationBotTokens,
   getSettings,
   saveTask,
   completeTask,
