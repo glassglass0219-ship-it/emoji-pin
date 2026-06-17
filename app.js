@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { App, ExpressReceiver } = require('@slack/bolt');
 const cron = require('node-cron');
+const db = require('./db');
 const {
   initDb,
   getSettings,
@@ -19,58 +20,51 @@ const {
   getUserIdsForReminderHour,
   countPendingCheckingTasks,
   getAllUserIdsWithPendingOldTasks,
-  storeInstallation,
-  fetchInstallation,
-  deleteInstallation,
   getInstallationBotToken,
   getInstallationBotTokens,
-} = require('./db');
+} = db;
 
 const APP_NAME = 'Emoji Pin';
 const SLACK_APP_ID = process.env.SLACK_APP_ID;
 const REQUIRED_BOT_SCOPES = [
   'channels:read',
-  'channels:join',
   'channels:history',
-  'groups:history',
   'chat:write',
-  'im:write',
   'reactions:read',
   'users:read',
+  'commands',
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
 
-// Slack の Event Subscriptions URL 検証 (url_verification) を確実に通すため、
-// ExpressReceiver を明示的に使い、/slack/events への challenge 応答を先に返す。
-const receiver = new ExpressReceiver({
+const app = new App({
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET,
   scopes: REQUIRED_BOT_SCOPES,
+  socketMode: false,
   installationStore: {
-    storeInstallation,
-    fetchInstallation,
-    deleteInstallation,
+    storeInstallation: async (installation) => {
+      await db.knex('installations')
+        .insert({
+          team_id: installation.team.id,
+          installation,
+        })
+        .onConflict('team_id')
+        .merge();
+    },
+    fetchInstallation: async (installQuery) => {
+      const row = await db.knex('installations').where({ team_id: installQuery.teamId }).first();
+      if (row) return row.installation;
+      throw new Error('No installation found');
+    },
   },
   installerOptions: {
+    directInstall: true,
     installPath: '/slack/install',
     redirectUriPath: '/slack/oauth_redirect',
   },
-  endpoints: '/slack/events',
-});
-
-receiver.router.post('/slack/events', (req, res, next) => {
-  if (req.body?.type === 'url_verification' && typeof req.body?.challenge === 'string') {
-    return res.status(200).send(req.body.challenge);
-  }
-  return next();
-});
-
-const app = new App({
-  socketMode: false,
-  receiver,
 });
 
 function getAppHomeButton() {

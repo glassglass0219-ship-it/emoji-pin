@@ -21,8 +21,8 @@ async function initDb() {
   if (!hasInstallations) {
     await knex.schema.createTable('installations', (t) => {
       t.string('team_id').primary();
-      t.string('enterprise_id');
-      t.jsonb('data').notNullable();
+      t.jsonb('installation');
+      t.timestamp('created_at').defaultTo(knex.fn.now());
     });
   }
 
@@ -30,12 +30,12 @@ async function initDb() {
     t.string('team_id');
   });
 
-  await ensureColumn('installations', 'enterprise_id', (t) => {
-    t.string('enterprise_id');
+  await ensureColumn('installations', 'installation', (t) => {
+    t.jsonb('installation');
   });
 
-  await ensureColumn('installations', 'data', (t) => {
-    t.jsonb('data');
+  await ensureColumn('installations', 'created_at', (t) => {
+    t.timestamp('created_at').defaultTo(knex.fn.now());
   });
 
   const hasTasks = await knex.schema.hasTable('tasks');
@@ -158,16 +158,14 @@ async function storeInstallation(installation) {
   const teamId = getInstallationTeamId(installation);
   const row = {
     team_id: teamId,
-    enterprise_id: installation.enterprise?.id || null,
-    data: installation,
+    installation,
   };
 
   await knex('installations')
     .insert(row)
     .onConflict('team_id')
     .merge({
-      enterprise_id: row.enterprise_id,
-      data: row.data,
+      installation: row.installation,
     });
 }
 
@@ -178,7 +176,7 @@ async function fetchInstallation(installQuery) {
     throw new Error(`Slack installation not found: ${teamId}`);
   }
 
-  return parseInstallationData(row.data);
+  return parseInstallationData(row.installation);
 }
 
 async function deleteInstallation(installQuery) {
@@ -189,15 +187,15 @@ async function deleteInstallation(installQuery) {
 async function getInstallationBotToken(teamId) {
   if (!teamId) return null;
   const row = await knex('installations').where({ team_id: teamId }).first();
-  const installation = row ? parseInstallationData(row.data) : null;
+  const installation = row ? parseInstallationData(row.installation) : null;
   return installation?.bot?.token || null;
 }
 
 async function getInstallationBotTokens() {
-  const rows = await knex('installations').select('team_id as teamId', 'data');
+  const rows = await knex('installations').select('team_id as teamId', 'installation');
   return rows
     .map((row) => {
-      const installation = parseInstallationData(row.data);
+      const installation = parseInstallationData(row.installation);
       return { teamId: row.teamId, botToken: installation?.bot?.token || null };
     })
     .filter((row) => row.botToken);
