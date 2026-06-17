@@ -3,7 +3,6 @@ const { App, ExpressReceiver } = require('@slack/bolt');
 const cron = require('node-cron');
 const db = require('./db');
 const {
-  initDb,
   getSettings,
   saveTask,
   completeTask,
@@ -21,7 +20,6 @@ const {
   countPendingCheckingTasks,
   getAllUserIdsWithPendingOldTasks,
   getInstallationBotToken,
-  getInstallationBotTokens,
 } = db;
 
 const APP_NAME = 'Emoji Pin';
@@ -37,34 +35,45 @@ const REQUIRED_BOT_SCOPES = [
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
 
-const app = new App({
+// 1. Receiver（サーバーの受け皿）を明示的に作成する
+const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET,
   scopes: REQUIRED_BOT_SCOPES,
-  socketMode: false,
   installationStore: {
     storeInstallation: async (installation) => {
-      await db.knex('installations')
-        .insert({
+      if (installation.isEnterpriseInstall && installation.enterprise !== undefined) {
+        return db.knex('installations').insert({
+          team_id: installation.enterprise.id,
+          installation: JSON.stringify(installation),
+        }).onConflict('team_id').merge();
+      }
+      if (installation.team !== undefined) {
+        return db.knex('installations').insert({
           team_id: installation.team.id,
-          installation,
-        })
-        .onConflict('team_id')
-        .merge();
+          installation: JSON.stringify(installation),
+        }).onConflict('team_id').merge();
+      }
+      throw new Error('Failed saving installation data to installationStore');
     },
     fetchInstallation: async (installQuery) => {
-      const row = await db.knex('installations').where({ team_id: installQuery.teamId }).first();
+      const teamId = installQuery.teamId || installQuery.enterpriseId;
+      const row = await db.knex('installations').where({ team_id: teamId }).first();
       if (row) return row.installation;
       throw new Error('No installation found');
     },
   },
   installerOptions: {
     directInstall: true,
-    installPath: '/slack/install',
-    redirectUriPath: '/slack/oauth_redirect',
   },
+});
+
+// 2. Appの初期化（receiverを渡す）
+const app = new App({
+  receiver,
+  // ※ token は書かない（installationStoreが自動で管理するため）
 });
 
 function getAppHomeButton() {
@@ -1006,18 +1015,7 @@ cron.schedule('0 9 * * *', async () => {
 // ─── 起動 ─────────────────────────────────────────────────────────────────────
 
 (async () => {
-  await initDb();
+  await db.initDb(); // データベースの初期化
   await app.start(process.env.PORT || 3000);
-  console.log(`⚡️ ${APP_NAME} Slack app is running!`);
-  console.log(`[${APP_NAME}] インストールURL: /slack/install`);
-
-  const installations = await getInstallationBotTokens();
-  for (const { teamId, botToken } of installations) {
-    verifyInstallReadiness(app.client, botToken).catch((error) => {
-      console.error(`[${APP_NAME}] 起動時の権限確認で予期しないエラーが発生しました (${teamId}):`, error);
-    });
-    joinAllPublicChannels(app.client, botToken).catch((error) => {
-      console.error(`[${APP_NAME}] 起動時のチャンネル自動参加で予期しないエラーが発生しました (${teamId}):`, error);
-    });
-  }
+  console.log('⚡️ Emoji Pin Slack app (OAuth mode) is running!');
 })();
