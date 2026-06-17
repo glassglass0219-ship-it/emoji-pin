@@ -1,11 +1,7 @@
-const sqlite3 = require('sqlite3');
-
 const knex = require('knex')({
-  client: 'sqlite3',
-  connection: {
-    filename: './grandline.db',
-  },
-  useNullAsDefault: true,
+  client: 'pg',
+  connection: process.env.DATABASE_URL,
+  searchPath: ['knex', 'public'],
 });
 
 const DEFAULT_CHECKING_EMOJI = 'eyes';
