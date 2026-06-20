@@ -1212,6 +1212,7 @@ cron.schedule('* * * * *', async () => {
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
+  console.log(`⏰ リマインドチェック中: ${currentHour}:${String(currentMinute).padStart(2, '0')}`);
   const reminderTargets = await getUserIdsForReminderTime(currentHour, currentMinute);
 
   for (const { teamId, userId } of reminderTargets) {
