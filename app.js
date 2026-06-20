@@ -1038,7 +1038,14 @@ cron.schedule('0 9 * * *', async () => {
 // ─── 起動 ─────────────────────────────────────────────────────────────────────
 
 (async () => {
-  await db.initDb(); // データベースの初期化
-  await app.start(process.env.PORT || 3000);
-  console.log('⚡️ Emoji Pin Slack app (OAuth mode) is running!');
+  try {
+    // 【重要】データベースのテーブルを作成・確認する
+    await db.initDb();
+
+    const port = process.env.PORT || 3000;
+    await app.start(port);
+    console.log(`⚡️ Emoji Pin is Live on port ${port}!`);
+  } catch (error) {
+    console.error('Failed to start app:', error);
+  }
 })();
