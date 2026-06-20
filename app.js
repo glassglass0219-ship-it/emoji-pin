@@ -257,100 +257,111 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     blocks.push({ type: 'divider' });
   }
 
-  const renderItems = (items, totalCount) => {
-    if (items.length === 0) return [];
-    const section = [];
-    const defaultUserIcon = 'https://api.slack.com/img/blocks/breadcrumbs/avatar.png';
+  const defaultUserIcon = 'https://api.slack.com/img/blocks/breadcrumbs/avatar.png';
 
-    items.forEach((t) => {
-      const link = `https://slack.com/archives/${t.channelId}/p${t.messageTs.replace('.', '')}`;
-      const createdAt = new Date(t.createdAt).toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).replace(/\//g, '.');
-      const displayUser = t.itemUser || t.userId;
-      const iconUrl = t.user_icon || t.userIcon || defaultUserIcon;
+  const buildItemCardBlocks = (t) => {
+    const link = `https://slack.com/archives/${t.channelId}/p${t.messageTs.replace('.', '')}`;
+    const createdAt = new Date(t.createdAt).toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).replace(/\//g, '.');
+    const displayUser = t.itemUser || t.userId;
+    const iconUrl = t.user_icon || t.userIcon || defaultUserIcon;
+    const cardBlocks = [{ type: 'divider' }];
 
-      section.push({ type: 'divider' });
+    let bodyText = `*<@${displayUser}>*\n`;
+    if (isInfoTab) {
+      bodyText += `📁 ${t.folder || '未分類'}\n`;
+    }
+    bodyText += t.text || '(テキストなし)';
 
-      const cardSection = {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*<@${displayUser}>*\n${t.text || '(テキストなし)'}`,
-        },
+    const cardSection = {
+      type: 'section',
+      text: { type: 'mrkdwn', text: bodyText },
+    };
+
+    if (isCheckingTab || isInfoTab) {
+      cardSection.accessory = {
+        type: 'button',
+        text: { type: 'plain_text', text: '✅ Done', emoji: true },
+        style: 'primary',
+        action_id: 'complete_task',
+        value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
       };
+    } else if (isDoneTab) {
+      cardSection.accessory = {
+        type: 'button',
+        text: { type: 'plain_text', text: '🔄 確認中に戻す', emoji: true },
+        style: 'primary',
+        action_id: 'reopen_to_checking',
+        value: JSON.stringify({ taskId: t.id }),
+      };
+    }
 
-      if (!isDoneTab) {
-        cardSection.accessory = {
-          type: 'button',
-          text: { type: 'plain_text', text: '✅ Done', emoji: true },
-          style: 'primary',
-          action_id: 'complete_task',
-          value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
-        };
-      }
+    cardBlocks.push(cardSection);
 
-      section.push(cardSection);
+    cardBlocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'image',
+          image_url: iconUrl,
+          alt_text: 'user',
+        },
+        {
+          type: 'mrkdwn',
+          text: `🕒 ${createdAt}  |  <${link}|メッセージを表示>`,
+        },
+      ],
+    });
 
-      section.push({
-        type: 'context',
+    if (isInfoTab) {
+      cardBlocks.push({
+        type: 'actions',
         elements: [
           {
-            type: 'image',
-            image_url: iconUrl,
-            alt_text: 'user',
-          },
-          {
-            type: 'mrkdwn',
-            text: `🕒 ${createdAt}  |  <${link}|メッセージを表示>`,
+            type: 'button',
+            text: { type: 'plain_text', text: '📁 移動', emoji: true },
+            action_id: 'open_move_folder_modal',
+            value: JSON.stringify({ taskId: t.id, folder: t.folder || '未分類' }),
           },
         ],
       });
+    }
 
-      if (isInfoTab) {
-        section.push({
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: '📁 移動', emoji: true },
-              action_id: 'open_move_folder_modal',
-              value: JSON.stringify({ taskId: t.id, folder: t.folder || '未分類' }),
-            },
-          ],
-        });
-      }
+    if (isDoneTab) {
+      cardBlocks.push({
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
+            action_id: 'reopen_to_info',
+            value: JSON.stringify({ taskId: t.id }),
+          },
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+            style: 'danger',
+            action_id: 'delete_item',
+            value: JSON.stringify({ taskId: t.id }),
+          },
+        ],
+      });
+    }
 
-      if (isDoneTab) {
-        section.push({
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: '🔄 確認中に戻す', emoji: true },
-              action_id: 'reopen_to_checking',
-              value: JSON.stringify({ taskId: t.id }),
-            },
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
-              action_id: 'reopen_to_info',
-              value: JSON.stringify({ taskId: t.id }),
-            },
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-              style: 'danger',
-              action_id: 'delete_item',
-              value: JSON.stringify({ taskId: t.id }),
-            },
-          ],
-        });
-      }
+    return cardBlocks;
+  };
+
+  const renderItems = (items, totalCount) => {
+    if (items.length === 0) return [];
+    const section = [];
+
+    items.forEach((t) => {
+      section.push(...buildItemCardBlocks(t));
     });
 
     if (items.length > 0) {
