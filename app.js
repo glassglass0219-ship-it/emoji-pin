@@ -242,7 +242,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         {
           type: 'button',
           text: { type: 'plain_text', text: '💥 DONEを一括削除', emoji: true },
-          style: 'danger',
+          style: 'primary',
           action_id: 'clear_all_done',
           value: 'done',
           confirm: {
@@ -336,7 +336,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-            style: 'danger',
+            style: 'primary',
             action_id: 'delete_item',
             value: JSON.stringify({ taskId: t.id }),
           },
