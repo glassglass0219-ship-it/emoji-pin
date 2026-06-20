@@ -263,7 +263,7 @@ async function getPendingTasks(userId, teamId = DEFAULT_TEAM_ID) {
 async function getHomeTasks(userId, teamId = DEFAULT_TEAM_ID) {
   return knex('tasks')
     .where({ teamId, userId })
-    .orderByRaw("CASE WHEN status = 'completed' THEN createdAt END DESC")
+    .orderByRaw('CASE WHEN status = \'completed\' THEN "createdAt" END DESC')
     .orderBy('createdAt', 'asc');
 }
 
@@ -362,14 +362,16 @@ async function countPendingCheckingTasks(userId, teamId = DEFAULT_TEAM_ID) {
 
 async function getPendingTasksOlderThan(hours, teamId = DEFAULT_TEAM_ID) {
   const threshold = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  return knex('tasks').where({ teamId, status: 'pending' }).where('createdAt', '<', threshold);
+  return knex('tasks')
+    .where({ teamId, status: 'pending' })
+    .where('"createdAt"', '<', threshold);
 }
 
 async function getAllUserIdsWithPendingOldTasks(hours) {
   const threshold = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const rows = await knex('tasks')
     .where({ status: 'pending' })
-    .where('createdAt', '<', threshold)
+    .where('"createdAt"', '<', threshold)
     .distinct('teamId', 'userId')
     .select('teamId', 'userId');
   return rows.map((r) => ({ teamId: r.teamId, userId: r.userId }));
