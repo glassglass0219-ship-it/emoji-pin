@@ -1,6 +1,44 @@
 require('dotenv').config();
 const { App, ExpressReceiver } = require('@slack/bolt');
 const cron = require('node-cron');
+
+const APP_NAME = 'Emoji Pin';
+const SLACK_APP_ID = process.env.SLACK_APP_ID;
+const REQUIRED_BOT_SCOPES = [
+  'channels:read',
+  'channels:history',
+  'chat:write',
+  'reactions:read',
+  'users:read',
+];
+const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
+const HOME_ITEM_LIMIT = 14;
+
+// --- デバッグ用：起動時に環境変数が読み込めているか確認 ---
+console.log('--- Environment Check ---');
+console.log('CLIENT_ID:', process.env.SLACK_CLIENT_ID ? 'OK' : 'MISSING');
+console.log('CLIENT_SECRET:', process.env.SLACK_CLIENT_SECRET ? 'OK' : 'MISSING');
+console.log('SIGNING_SECRET:', process.env.SLACK_SIGNING_SECRET ? 'OK' : 'MISSING');
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'OK' : 'MISSING');
+console.log('--- --- --- --- --- ---');
+
+const missingEnv = [
+  ['SLACK_SIGNING_SECRET', process.env.SLACK_SIGNING_SECRET],
+  ['SLACK_CLIENT_ID', process.env.SLACK_CLIENT_ID],
+  ['SLACK_CLIENT_SECRET', process.env.SLACK_CLIENT_SECRET],
+  ['SLACK_STATE_SECRET', process.env.SLACK_STATE_SECRET],
+  ['DATABASE_URL', process.env.DATABASE_URL],
+].filter(([, value]) => !value);
+
+if (missingEnv.length > 0) {
+  console.error('\n[Emoji Pin] .env に未設定の項目があります:');
+  missingEnv.forEach(([name]) => console.error(`  - ${name}`));
+  console.error('\nSlack API → Basic Information から CLIENT_ID / CLIENT_SECRET をコピーし、');
+  console.error('Render → PostgreSQL → External Database URL を DATABASE_URL に設定してください。');
+  console.error('.env を保存したあと、node app.js を再起動してください。\n');
+  process.exit(1);
+}
+
 const db = require('./db');
 const {
   getSettings,
@@ -22,46 +60,25 @@ const {
   getInstallationBotToken,
 } = db;
 
-const APP_NAME = 'Emoji Pin';
-const SLACK_APP_ID = process.env.SLACK_APP_ID;
-const REQUIRED_BOT_SCOPES = [
-  'channels:read',
-  'channels:history',
-  'chat:write',
-  'reactions:read',
-  'users:read',
-  'commands',
-];
-const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
-const HOME_ITEM_LIMIT = 14;
-
-// 1. Receiver（サーバーの受け皿）を明示的に作成する
+// 1. Receiverの作成
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
-  stateSecret: process.env.SLACK_STATE_SECRET,
-  scopes: REQUIRED_BOT_SCOPES,
+  stateSecret: process.env.SLACK_STATE_SECRET || 'emoji-pin-default-state-secret',
+  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read'],
   installationStore: {
     storeInstallation: async (installation) => {
-      if (installation.isEnterpriseInstall && installation.enterprise !== undefined) {
-        return db.knex('installations').insert({
-          team_id: installation.enterprise.id,
-          installation: JSON.stringify(installation),
-        }).onConflict('team_id').merge();
-      }
-      if (installation.team !== undefined) {
-        return db.knex('installations').insert({
-          team_id: installation.team.id,
-          installation: JSON.stringify(installation),
-        }).onConflict('team_id').merge();
-      }
-      throw new Error('Failed saving installation data to installationStore');
+      const teamId = installation.team?.id || installation.enterprise?.id;
+      await db.knex('installations').insert({
+        team_id: teamId,
+        installation: JSON.stringify(installation),
+      }).onConflict('team_id').merge();
     },
     fetchInstallation: async (installQuery) => {
       const teamId = installQuery.teamId || installQuery.enterpriseId;
       const row = await db.knex('installations').where({ team_id: teamId }).first();
-      if (row) return row.installation;
+      if (row) return JSON.parse(row.installation);
       throw new Error('No installation found');
     },
   },
@@ -70,11 +87,12 @@ const receiver = new ExpressReceiver({
   },
 });
 
-// 2. Appの初期化（receiverを渡す）
+// 2. Appの作成（receiverを必ず渡す）
 const app = new App({
-  receiver,
-  // ※ token は書かない（installationStoreが自動で管理するため）
+  receiver: receiver, // これを渡すとOAuthモードとして起動しようとします
 });
+
+// 以降、app.event や app.action のロジックを続ける...
 
 function getAppHomeButton() {
   return {

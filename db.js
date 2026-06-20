@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const knex = require('knex')({
   client: 'pg',
   connection: {
@@ -20,27 +22,6 @@ async function ensureColumn(tableName, columnName, addColumn) {
 }
 
 async function initDb() {
-  const hasInstallations = await knex.schema.hasTable('installations');
-  if (!hasInstallations) {
-    await knex.schema.createTable('installations', (t) => {
-      t.string('team_id').primary();
-      t.jsonb('installation');
-      t.timestamp('created_at').defaultTo(knex.fn.now());
-    });
-  }
-
-  await ensureColumn('installations', 'team_id', (t) => {
-    t.string('team_id');
-  });
-
-  await ensureColumn('installations', 'installation', (t) => {
-    t.jsonb('installation');
-  });
-
-  await ensureColumn('installations', 'created_at', (t) => {
-    t.timestamp('created_at').defaultTo(knex.fn.now());
-  });
-
   const hasTasks = await knex.schema.hasTable('tasks');
   if (!hasTasks) {
     await knex.schema.createTable('tasks', (t) => {
@@ -141,6 +122,27 @@ async function initDb() {
     await knex('migrations').insert({ name: TASK_EMOJI_DEFAULT_MIGRATION });
   }
 
+  const hasInstallations = await knex.schema.hasTable('installations');
+  if (!hasInstallations) {
+    await knex.schema.createTable('installations', (t) => {
+      t.string('team_id').primary();
+      t.text('installation');
+      t.timestamp('created_at').defaultTo(knex.fn.now());
+    });
+  }
+
+  await ensureColumn('installations', 'team_id', (t) => {
+    t.string('team_id');
+  });
+
+  await ensureColumn('installations', 'installation', (t) => {
+    t.text('installation');
+  });
+
+  await ensureColumn('installations', 'created_at', (t) => {
+    t.timestamp('created_at').defaultTo(knex.fn.now());
+  });
+
 }
 
 function getInstallationTeamId(query = {}) {
@@ -161,7 +163,7 @@ async function storeInstallation(installation) {
   const teamId = getInstallationTeamId(installation);
   const row = {
     team_id: teamId,
-    installation,
+    installation: JSON.stringify(installation),
   };
 
   await knex('installations')
