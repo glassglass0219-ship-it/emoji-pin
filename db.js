@@ -6,6 +6,11 @@ const knex = require('knex')({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
   },
+  pool: {
+    min: 0,
+    max: 10,
+    idleTimeoutMillis: 30000,
+  },
   searchPath: ['knex', 'public'],
 });
 
@@ -126,7 +131,7 @@ async function initDb() {
   if (!hasInstallations) {
     await knex.schema.createTable('installations', (t) => {
       t.string('team_id').primary();
-      t.text('installation');
+      t.jsonb('installation');
       t.timestamp('created_at').defaultTo(knex.fn.now());
     });
   }
@@ -136,7 +141,7 @@ async function initDb() {
   });
 
   await ensureColumn('installations', 'installation', (t) => {
-    t.text('installation');
+    t.jsonb('installation');
   });
 
   await ensureColumn('installations', 'created_at', (t) => {
@@ -163,7 +168,7 @@ async function storeInstallation(installation) {
   const teamId = getInstallationTeamId(installation);
   const row = {
     team_id: teamId,
-    installation: JSON.stringify(installation),
+    installation,
   };
 
   await knex('installations')
