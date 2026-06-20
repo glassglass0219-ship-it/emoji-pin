@@ -70,20 +70,28 @@ const receiver = new ExpressReceiver({
   installationStore: {
     storeInstallation: async (installation) => {
       const teamId = installation.team?.id || installation.enterprise?.id;
-      console.log(`Saving installation for team: ${teamId}`);
+      console.log(`💾 Saving installation for team: ${teamId}`);
+
+      const dataToStore = typeof installation === 'string' ? installation : JSON.stringify(installation);
+
       await db.knex('installations').insert({
         team_id: teamId,
-        installation: installation,
+        installation: dataToStore,
       }).onConflict('team_id').merge();
     },
     fetchInstallation: async (installQuery) => {
       const teamId = installQuery.teamId || installQuery.enterpriseId;
       const row = await db.knex('installations').where({ team_id: teamId }).first();
+
       if (row) {
-        console.log(`Installation found for team: ${teamId}`);
-        return row.installation;
+        console.log(`🔍 Found installation in DB for team: ${teamId}`);
+        const data = (typeof row.installation === 'string')
+          ? JSON.parse(row.installation)
+          : row.installation;
+
+        return data;
       }
-      console.error(`No installation found for team: ${teamId}`);
+      console.error(`❌ No installation found for team: ${teamId}`);
       throw new Error('No installation found');
     },
   },
