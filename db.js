@@ -85,6 +85,14 @@ async function initDb() {
     t.string('teamId').notNullable().defaultTo(DEFAULT_TEAM_ID);
   });
 
+  await ensureColumn('settings', 'checkingSort', (t) => {
+    t.string('checkingSort').defaultTo('desc');
+  });
+
+  await ensureColumn('settings', 'docsSort', (t) => {
+    t.string('docsSort').defaultTo('desc');
+  });
+
   const hasReminderSettings = await knex.schema.hasTable('reminder_settings');
   if (!hasReminderSettings) {
     await knex.schema.createTable('reminder_settings', (t) => {
@@ -226,6 +234,8 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
       userId,
       taskEmoji: DEFAULT_CHECKING_EMOJI,
       infoEmoji: DEFAULT_INFO_EMOJI,
+      checkingSort: 'desc',
+      docsSort: 'desc',
     });
     row = await knex('settings').where({ userId, teamId }).first();
   }
@@ -257,14 +267,30 @@ async function completeTask({ teamId = DEFAULT_TEAM_ID, messageTs, channelId }) 
 }
 
 async function getPendingTasks(userId, teamId = DEFAULT_TEAM_ID) {
-  return knex('tasks').where({ teamId, userId, status: 'pending' }).orderBy('createdAt', 'asc');
+  return knex('tasks').where({ teamId, userId, status: 'pending' }).orderBy('"createdAt"', 'asc');
 }
 
-async function getHomeTasks(userId, teamId = DEFAULT_TEAM_ID) {
+async function getHomeTasks(userId, teamId = DEFAULT_TEAM_ID, checkingSort = 'desc', docsSort = 'desc') {
   return knex('tasks')
     .where({ teamId, userId })
-    .orderByRaw('CASE WHEN status = \'completed\' THEN "createdAt" END DESC')
-    .orderBy('createdAt', 'asc');
+    .orderByRaw(`
+      CASE 
+        WHEN category = 'TASK' THEN 
+          CASE WHEN status = 'pending' THEN 1 ELSE 2 END
+        WHEN category = 'INFO' THEN 1
+        ELSE 3
+      END ASC
+    `)
+    .orderByRaw(`
+      CASE 
+        WHEN category = 'TASK' THEN "createdAt" 
+      END ${checkingSort === 'asc' ? 'ASC' : 'DESC'}
+    `)
+    .orderByRaw(`
+      CASE 
+        WHEN category = 'INFO' THEN "createdAt" 
+      END ${docsSort === 'asc' ? 'ASC' : 'DESC'}
+    `);
 }
 
 async function reopenTask(userId, taskId, category, teamId = DEFAULT_TEAM_ID) {

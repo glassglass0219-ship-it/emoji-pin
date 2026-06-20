@@ -116,6 +116,39 @@ function getAppHomeButton() {
   };
 }
 
+function buildCheckingReminderBlocks(count) {
+  return [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '🚨🚨🚨 *Emoji Pin リマインド* 🚨🚨🚨',
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `確認中のタスクが *${count}件* あります！ 忘れないうちにチェックしましょう 🚀`,
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '⏰ *今すぐチェック* ｜ 👀 確認中タブを開いて整理しましょう ✨',
+        },
+      ],
+    },
+    { type: 'divider' },
+    {
+      type: 'actions',
+      elements: [getAppHomeButton()],
+    },
+  ];
+}
+
 function getTeamId(payload = {}) {
   return payload.team?.id || payload.team_id || payload.event?.team || payload.authorizations?.[0]?.team_id || 'default';
 }
@@ -167,7 +200,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         {
           type: 'button',
           text: { type: 'plain_text', text: '⚙️ 設定', emoji: true },
-          value: 'settings',
+          value: JSON.stringify({ tab: selectedTab, folder: safeSelectedFolder }),
           action_id: 'open_settings_modal',
         },
       ],
@@ -374,6 +407,31 @@ async function publishHomeView(client, userId, tasks, selectedTab = 'checking', 
     user_id: userId,
     view,
   });
+}
+
+function toSortRadioOption(sort) {
+  if (sort === 'asc') {
+    return { text: { type: 'plain_text', text: '古い順（昇順）' }, value: 'asc' };
+  }
+  return { text: { type: 'plain_text', text: '新しい順（降順）' }, value: 'desc' };
+}
+
+function getInitialSortOption(sort) {
+  return toSortRadioOption(sort === 'asc' ? 'asc' : 'desc');
+}
+
+function normalizeSort(sort) {
+  return sort === 'asc' ? 'asc' : 'desc';
+}
+
+async function fetchHomeTasks(userId, teamId) {
+  const settings = await getSettings(userId, teamId);
+  return getHomeTasks(
+    userId,
+    teamId,
+    normalizeSort(settings.checkingSort),
+    normalizeSort(settings.docsSort)
+  );
 }
 
 function withBotToken(args, botToken) {
@@ -600,7 +658,7 @@ function parseCompleteTaskActionValue(value) {
 
 app.event('app_home_opened', async ({ event, body, client }) => {
   const teamId = getTeamId(body);
-  const tasks = await getHomeTasks(event.user, teamId);
+  const tasks = await fetchHomeTasks(event.user, teamId);
   await publishHomeView(client, event.user, tasks, 'checking', 'すべて', teamId);
 });
 
@@ -613,7 +671,7 @@ app.action(/^switch_tab_/, async ({ body, action, client, ack }) => {
         ? 'info'
         : 'checking';
   const teamId = getTeamId(body);
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, selectedTab, 'すべて', teamId);
 });
 
@@ -621,14 +679,14 @@ app.action(/^switch_folder_/, async ({ body, action, client, ack }) => {
   await ack();
   const selectedFolder = action.value || 'すべて';
   const teamId = getTeamId(body);
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'info', selectedFolder, teamId);
 });
 
 app.action('open_app_home_from_reminder', async ({ body, client, ack }) => {
   await ack();
   const teamId = getTeamId(body);
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'checking', 'すべて', teamId);
 });
 
@@ -641,14 +699,14 @@ app.action('complete_task', async ({ body, action, client, ack }) => {
   const parsedAction = parseCompleteTaskActionValue(action.value || body.actions?.[0]?.value);
   if (!parsedAction) {
     console.warn(`[${APP_NAME}] 完了ボタンのvalueからtaskIdを取得できませんでした: ${action.value}`);
-    const tasks = await getHomeTasks(body.user.id, teamId);
+    const tasks = await fetchHomeTasks(body.user.id, teamId);
     await publishHomeView(client, body.user.id, tasks, 'checking', 'すべて', teamId);
     return;
   }
 
   await knex('tasks').where({ id: parsedAction.taskId, teamId, userId: body.user.id }).update({ status: 'completed' });
 
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, parsedAction.selectedTab, parsedAction.selectedFolder, teamId);
 });
 
@@ -658,7 +716,7 @@ app.action(/^(reopen_to_checking|reopen_to_info)$/, async ({ body, action, clien
   const parsedAction = parseCompleteTaskActionValue(action.value || body.actions?.[0]?.value);
   if (!parsedAction) {
     console.warn(`[${APP_NAME}] 再オープンボタンのvalueからtaskIdを取得できませんでした: ${action.value}`);
-    const tasks = await getHomeTasks(body.user.id, teamId);
+    const tasks = await fetchHomeTasks(body.user.id, teamId);
     await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
     return;
   }
@@ -666,7 +724,7 @@ app.action(/^(reopen_to_checking|reopen_to_info)$/, async ({ body, action, clien
   const nextCategory = action.action_id === 'reopen_to_info' ? 'INFO' : 'TASK';
   await reopenTask(body.user.id, parsedAction.taskId, nextCategory, teamId);
 
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
 });
 
@@ -680,7 +738,7 @@ app.action('delete_item', async ({ body, action, client, ack }) => {
   }
 
   await deleteTask(body.user.id, parsedAction.taskId, teamId);
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
 });
 
@@ -688,7 +746,7 @@ app.action('clear_all_done', async ({ body, client, ack }) => {
   await ack();
   const teamId = getTeamId(body);
   await deleteCompletedTasks(body.user.id, teamId);
-  const tasks = await getHomeTasks(body.user.id, teamId);
+  const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
 });
 
@@ -700,11 +758,19 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
   const settings = await getSettings(body.user.id, teamId);
   const emojiOptions = businessEmojiOptions.map(toSlackSelectOption);
   const reminderHours = await getReminderHours(body.user.id, teamId);
+  let homeContext = { tab: 'checking', folder: 'すべて' };
+  try {
+    const parsed = JSON.parse(body.actions?.[0]?.value || '{}');
+    if (parsed.tab) homeContext = parsed;
+  } catch {
+    // legacy button value
+  }
   await client.views.open({
     trigger_id: body.trigger_id,
     view: {
       type: 'modal',
       callback_id: 'save_settings',
+      private_metadata: JSON.stringify(homeContext),
       title: { type: 'plain_text', text: '環境設定' },
       submit: { type: 'plain_text', text: '保存' },
       close: { type: 'plain_text', text: 'キャンセル' },
@@ -735,6 +801,28 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
         },
         {
           type: 'input',
+          block_id: 'checking_sort_block',
+          label: { type: 'plain_text', text: '確認中の並び替え' },
+          element: {
+            type: 'radio_buttons',
+            action_id: 'checking_sort_input',
+            options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
+            initial_option: getInitialSortOption(settings.checkingSort),
+          },
+        },
+        {
+          type: 'input',
+          block_id: 'docs_sort_block',
+          label: { type: 'plain_text', text: '資料の並び替え' },
+          element: {
+            type: 'radio_buttons',
+            action_id: 'docs_sort_input',
+            options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
+            initial_option: getInitialSortOption(settings.docsSort),
+          },
+        },
+        {
+          type: 'input',
           block_id: 'reminder_hours_block',
           optional: true,
           label: { type: 'plain_text', text: 'リマインド時間を選択（複数選択可）' },
@@ -760,26 +848,56 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const teamId = getTeamId(body);
   const checkingEmoji = vals.checking_emoji_block.checking_emoji_input.selected_option.value;
   const infoEmoji = vals.info_emoji_block.info_emoji_input.selected_option.value;
+  const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
+  const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
   const reminderHours =
     vals.reminder_hours_block.reminder_hours_input.selected_options?.map((option) =>
       Number(option.value)
     ) || [];
+  let homeContext = { tab: 'checking', folder: 'すべて' };
+  try {
+    homeContext = JSON.parse(view.private_metadata || '{}');
+  } catch {
+    // ignore invalid metadata
+  }
 
   const { knex } = require('./db');
   const existingSettings = await knex('settings').where({ teamId, userId }).first();
   if (existingSettings) {
-    await knex('settings').where({ teamId, userId }).update({ taskEmoji: checkingEmoji, infoEmoji });
+    await knex('settings').where({ teamId, userId }).update({
+      taskEmoji: checkingEmoji,
+      infoEmoji,
+      checkingSort,
+      docsSort,
+    });
   } else {
     const legacySettings = await knex('settings').where({ teamId: 'default', userId }).first();
     if (legacySettings) {
       await knex('settings')
         .where({ teamId: 'default', userId })
-        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji });
+        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort });
     } else {
-      await knex('settings').insert({ teamId, userId, taskEmoji: checkingEmoji, infoEmoji });
+      await knex('settings').insert({
+        teamId,
+        userId,
+        taskEmoji: checkingEmoji,
+        infoEmoji,
+        checkingSort,
+        docsSort,
+      });
     }
   }
   await replaceReminderHours(userId, reminderHours, teamId);
+
+  const tasks = await fetchHomeTasks(userId, teamId);
+  await publishHomeView(
+    client,
+    userId,
+    tasks,
+    homeContext.tab || 'checking',
+    homeContext.folder || 'すべて',
+    teamId
+  );
 
   const dmChannel = await getDmChannel(client, userId);
   const reminderText =
@@ -790,9 +908,11 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
           .map((hour) => `${hour}:00`)
           .join(', ')
       : '未設定';
+  const checkingSortLabel = checkingSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
+  const docsSortLabel = docsSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
   await client.chat.postMessage({
     channel: dmChannel,
-    text: `✅ ${APP_NAME} の環境設定を保存しました！\n• 確認中用: :${checkingEmoji}:\n• 資料用: :${infoEmoji}:\n• リマインド時間: ${reminderText}`,
+    text: `✅ ${APP_NAME} の環境設定を保存しました！\n• 確認中用: :${checkingEmoji}:\n• 資料用: :${infoEmoji}:\n• 確認中の並び替え: ${checkingSortLabel}\n• 資料の並び替え: ${docsSortLabel}\n• リマインド時間: ${reminderText}`,
   });
 });
 
@@ -849,7 +969,7 @@ app.view('save_folder_settings', async ({ view, body, client, ack }) => {
 
   await replaceFolders(userId, folders, teamId);
 
-  const tasks = await getHomeTasks(userId, teamId);
+  const tasks = await fetchHomeTasks(userId, teamId);
   await publishHomeView(client, userId, tasks, 'info', 'すべて', teamId);
 });
 
@@ -923,7 +1043,7 @@ app.view('save_move_folder', async ({ view, body, client, ack }) => {
   const task = await updateTaskFolder(userId, taskId, folder, teamId);
   console.log(`[${APP_NAME}] 資料フォルダ移動完了:`, task);
 
-  const tasks = await getHomeTasks(userId, teamId);
+  const tasks = await fetchHomeTasks(userId, teamId);
   await publishHomeView(client, userId, tasks, 'info', task?.folder || '未分類', teamId);
 });
 
@@ -986,20 +1106,8 @@ cron.schedule('0 * * * *', async () => {
       await app.client.chat.postMessage({
         token: botToken,
         channel: dmChannel,
-        text: `${APP_NAME}: 確認中のタスクが ${count} 件あります。`,
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*${APP_NAME} リマインド*\n確認中のタスクが *${count}件* あります。`,
-            },
-          },
-          {
-            type: 'actions',
-            elements: [getAppHomeButton()],
-          },
-        ],
+        text: `🚨🚨🚨 Emoji Pin リマインド 🚨🚨🚨 確認中のタスクが ${count}件 あります！ 忘れないうちにチェックしましょう 🚀`,
+        blocks: buildCheckingReminderBlocks(count),
       });
     } catch (error) {
       console.error(`[${APP_NAME}] カスタムリマインド送信エラー (${userId}):`, error);
