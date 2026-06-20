@@ -275,8 +275,14 @@ function normalizeFolderName(name) {
   return folder || '未分類';
 }
 
-async function completeTask({ teamId = DEFAULT_TEAM_ID, messageTs, channelId }) {
-  return knex('tasks').where({ teamId, messageTs, channelId, status: 'pending' }).update({ status: 'completed' });
+async function completeTask({ teamId = DEFAULT_TEAM_ID, messageTs, channelId, taskId, userId }) {
+  const query = knex('tasks').where({ teamId, status: 'pending' });
+  if (taskId != null) {
+    query.where({ id: taskId, userId });
+  } else {
+    query.where({ messageTs, channelId });
+  }
+  return query.update({ status: 'completed' });
 }
 
 async function getPendingTasks(userId, teamId = DEFAULT_TEAM_ID) {
@@ -306,15 +312,10 @@ async function getHomeTasks(userId, teamId = DEFAULT_TEAM_ID, checkingSort = 'de
     `);
 }
 
-async function reopenTask(userId, taskId, category, teamId = DEFAULT_TEAM_ID) {
-  const nextCategory = category === 'INFO' ? 'INFO' : 'TASK';
+async function restoreTask(userId, taskId, teamId = DEFAULT_TEAM_ID) {
   await knex('tasks')
     .where({ id: taskId, userId, teamId })
-    .update({
-      category: nextCategory,
-      status: 'pending',
-      folder: nextCategory === 'INFO' ? '未分類' : '未分類',
-    });
+    .update({ status: 'pending' });
   return knex('tasks').where({ id: taskId, userId, teamId }).first();
 }
 
@@ -449,7 +450,7 @@ module.exports = {
   completeTask,
   getPendingTasks,
   getHomeTasks,
-  reopenTask,
+  restoreTask,
   deleteTask,
   deleteCompletedTasks,
   getFolders,

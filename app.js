@@ -46,7 +46,7 @@ const {
   completeTask,
   getPendingTasks,
   getHomeTasks,
-  reopenTask,
+  restoreTask,
   deleteTask,
   deleteCompletedTasks,
   getFolders,
@@ -283,16 +283,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       text: { type: 'mrkdwn', text: bodyText },
     };
 
-    if (isDoneTab) {
-      cardSection.accessory = {
-        type: 'button',
-        text: { type: 'plain_text', text: '🔄 確認中に戻す', emoji: true },
-        style: 'primary',
-        action_id: 'reopen_to_checking',
-        value: JSON.stringify({ taskId: t.id }),
-      };
-    }
-
     cardBlocks.push(cardSection);
 
     cardBlocks.push({
@@ -339,8 +329,8 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         elements: [
           {
             type: 'button',
-            text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
-            action_id: 'reopen_to_info',
+            text: { type: 'plain_text', text: '🔄 戻す', emoji: true },
+            action_id: 'restore_item',
             value: JSON.stringify({ taskId: t.id }),
           },
           {
@@ -890,7 +880,6 @@ app.action('open_app_home_from_reminder', async ({ body, client, ack }) => {
 
 app.action('complete_task', async ({ body, action, client, ack }) => {
   await ack();
-  const { knex } = require('./db');
   const teamId = getTeamId(body);
   const parsedAction = parseCompleteTaskActionValue(action.value || body.actions?.[0]?.value);
   if (!parsedAction) {
@@ -900,25 +889,24 @@ app.action('complete_task', async ({ body, action, client, ack }) => {
     return;
   }
 
-  await knex('tasks').where({ id: parsedAction.taskId, teamId, userId: body.user.id }).update({ status: 'completed' });
+  await completeTask({ teamId, taskId: parsedAction.taskId, userId: body.user.id });
 
   const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, parsedAction.selectedTab, parsedAction.selectedFolder, teamId);
 });
 
-app.action(/^(reopen_to_checking|reopen_to_info)$/, async ({ body, action, client, ack }) => {
+app.action('restore_item', async ({ body, action, client, ack }) => {
   await ack();
   const teamId = getTeamId(body);
   const parsedAction = parseCompleteTaskActionValue(action.value || body.actions?.[0]?.value);
   if (!parsedAction) {
-    console.warn(`[${APP_NAME}] 再オープンボタンのvalueからtaskIdを取得できませんでした: ${action.value}`);
+    console.warn(`[${APP_NAME}] 戻すボタンのvalueからtaskIdを取得できませんでした: ${action.value}`);
     const tasks = await fetchHomeTasks(body.user.id, teamId);
     await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
     return;
   }
 
-  const nextCategory = action.action_id === 'reopen_to_info' ? 'INFO' : 'TASK';
-  await reopenTask(body.user.id, parsedAction.taskId, nextCategory, teamId);
+  await restoreTask(body.user.id, parsedAction.taskId, teamId);
 
   const tasks = await fetchHomeTasks(body.user.id, teamId);
   await publishHomeView(client, body.user.id, tasks, 'done', 'すべて', teamId);
