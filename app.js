@@ -52,9 +52,9 @@ const {
   getFolders,
   replaceFolders,
   updateTaskFolder,
-  getReminderHours,
-  replaceReminderHours,
-  getUserIdsForReminderHour,
+  getReminderTimes,
+  replaceReminderTimes,
+  getUserIdsForReminderTime,
   countPendingCheckingTasks,
   getAllUserIdsWithPendingOldTasks,
   getInstallationBotToken,
@@ -608,19 +608,197 @@ function getInitialEmojiOption(savedValue, fallbackValue) {
   return toSlackSelectOption(selected);
 }
 
-function toReminderHourOption(hour) {
+function formatReminderTime({ hour, minute }) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function parseTimepickerValue(timeString) {
+  if (!timeString) return null;
+  const [hourStr, minuteStr] = timeString.split(':');
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  return { hour, minute };
+}
+
+function normalizeReminderTimesList(times) {
+  const map = new Map();
+  for (const time of times || []) {
+    const hour = Number(time.hour);
+    const minute = Number(time.minute ?? 0);
+    if (Number.isInteger(hour) && hour >= 0 && hour <= 23 && Number.isInteger(minute) && minute >= 0 && minute <= 59) {
+      map.set(`${hour}:${minute}`, { hour, minute });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.hour - b.hour || a.minute - b.minute);
+}
+
+function parseSettingsModalMetadata(privateMetadata) {
+  try {
+    const parsed = JSON.parse(privateMetadata || '{}');
+    return {
+      tab: parsed.tab || 'checking',
+      folder: parsed.folder || 'すべて',
+      reminderTimes: normalizeReminderTimesList(parsed.reminderTimes || []),
+    };
+  } catch {
+    return { tab: 'checking', folder: 'すべて', reminderTimes: [] };
+  }
+}
+
+function buildSettingsModalMetadata(homeContext, reminderTimes) {
+  return JSON.stringify({
+    tab: homeContext.tab || 'checking',
+    folder: homeContext.folder || 'すべて',
+    reminderTimes: normalizeReminderTimesList(reminderTimes),
+  });
+}
+
+function getSettingsFromViewOrDefaults(view, dbSettings) {
+  const vals = view?.state?.values || {};
   return {
-    text: { type: 'plain_text', text: `${hour}:00`, emoji: true },
-    value: String(hour),
+    taskEmoji: vals.checking_emoji_block?.checking_emoji_input?.selected_option?.value || dbSettings.taskEmoji,
+    infoEmoji: vals.info_emoji_block?.info_emoji_input?.selected_option?.value || dbSettings.infoEmoji,
+    checkingSort: vals.checking_sort_block?.checking_sort_input?.selected_option?.value || dbSettings.checkingSort,
+    docsSort: vals.docs_sort_block?.docs_sort_input?.selected_option?.value || dbSettings.docsSort,
   };
 }
 
-function getReminderHourOptions() {
-  return Array.from({ length: 24 }, (_, hour) => toReminderHourOption(hour));
+function buildSettingsModalBlocks(settings, reminderTimes) {
+  const emojiOptions = businessEmojiOptions.map(toSlackSelectOption);
+  const blocks = [
+    {
+      type: 'input',
+      block_id: 'checking_emoji_block',
+      label: { type: 'plain_text', text: '確認中用スタンプ' },
+      element: {
+        type: 'static_select',
+        action_id: 'checking_emoji_input',
+        placeholder: { type: 'plain_text', text: '絵文字を選択' },
+        options: emojiOptions,
+        initial_option: getInitialEmojiOption(settings.taskEmoji, DEFAULT_CHECKING_EMOJI),
+      },
+    },
+    {
+      type: 'input',
+      block_id: 'info_emoji_block',
+      label: { type: 'plain_text', text: '資料用スタンプ' },
+      element: {
+        type: 'static_select',
+        action_id: 'info_emoji_input',
+        placeholder: { type: 'plain_text', text: '絵文字を選択' },
+        options: emojiOptions,
+        initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI),
+      },
+    },
+    {
+      type: 'input',
+      block_id: 'checking_sort_block',
+      label: { type: 'plain_text', text: '確認中の並び替え' },
+      element: {
+        type: 'radio_buttons',
+        action_id: 'checking_sort_input',
+        options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
+        initial_option: getInitialSortOption(settings.checkingSort),
+      },
+    },
+    {
+      type: 'input',
+      block_id: 'docs_sort_block',
+      label: { type: 'plain_text', text: '資料の並び替え' },
+      element: {
+        type: 'radio_buttons',
+        action_id: 'docs_sort_input',
+        options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
+        initial_option: getInitialSortOption(settings.docsSort),
+      },
+    },
+    { type: 'divider' },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*⏰ リマインド時刻*\n登録した時刻に、確認中タスクのリマインドを送信します。',
+      },
+    },
+  ];
+
+  if (reminderTimes.length === 0) {
+    blocks.push({
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: 'リマインド時刻はまだ設定されていません。' }],
+    });
+  } else {
+    reminderTimes.forEach((time, index) => {
+      blocks.push({
+        type: 'section',
+        text: { type: 'mrkdwn', text: `• *${formatReminderTime(time)}*` },
+        accessory: {
+          type: 'button',
+          text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+          action_id: 'remove_reminder_time',
+          value: String(index),
+        },
+      });
+    });
+  }
+
+  blocks.push(
+    {
+      type: 'input',
+      block_id: 'new_reminder_time_block',
+      optional: true,
+      label: { type: 'plain_text', text: '追加する時刻' },
+      element: {
+        type: 'timepicker',
+        action_id: 'new_reminder_time_input',
+        placeholder: { type: 'plain_text', text: '時:分 を選択' },
+      },
+    },
+    {
+      type: 'actions',
+      block_id: 'reminder_time_actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '➕ 追加', emoji: true },
+          action_id: 'add_reminder_time',
+          style: 'primary',
+        },
+      ],
+    }
+  );
+
+  return blocks;
 }
 
-function getInitialReminderHourOptions(hours) {
-  return hours.map((hour) => toReminderHourOption(hour));
+function buildSettingsModalView(settings, reminderTimes, homeContext) {
+  return {
+    type: 'modal',
+    callback_id: 'save_settings',
+    private_metadata: buildSettingsModalMetadata(homeContext, reminderTimes),
+    title: { type: 'plain_text', text: '環境設定' },
+    submit: { type: 'plain_text', text: '保存' },
+    close: { type: 'plain_text', text: 'キャンセル' },
+    blocks: buildSettingsModalBlocks(settings, reminderTimes),
+  };
+}
+
+async function updateSettingsModal(client, body, reminderTimes) {
+  const teamId = getTeamId(body);
+  const dbSettings = await getSettings(body.user.id, teamId);
+  const metadata = parseSettingsModalMetadata(body.view.private_metadata);
+  const settings = getSettingsFromViewOrDefaults(body.view, dbSettings);
+
+  await client.views.update({
+    view_id: body.view.id,
+    hash: body.view.hash,
+    view: buildSettingsModalView(settings, reminderTimes, {
+      tab: metadata.tab,
+      folder: metadata.folder,
+    }),
+  });
 }
 
 function toFolderSelectOption(folder) {
@@ -756,8 +934,7 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
   await ack();
   const teamId = getTeamId(body);
   const settings = await getSettings(body.user.id, teamId);
-  const emojiOptions = businessEmojiOptions.map(toSlackSelectOption);
-  const reminderHours = await getReminderHours(body.user.id, teamId);
+  const reminderTimes = await getReminderTimes(body.user.id, teamId);
   let homeContext = { tab: 'checking', folder: 'すべて' };
   try {
     const parsed = JSON.parse(body.actions?.[0]?.value || '{}');
@@ -767,78 +944,27 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
   }
   await client.views.open({
     trigger_id: body.trigger_id,
-    view: {
-      type: 'modal',
-      callback_id: 'save_settings',
-      private_metadata: JSON.stringify(homeContext),
-      title: { type: 'plain_text', text: '環境設定' },
-      submit: { type: 'plain_text', text: '保存' },
-      close: { type: 'plain_text', text: 'キャンセル' },
-      blocks: [
-        {
-          type: 'input',
-          block_id: 'checking_emoji_block',
-          label: { type: 'plain_text', text: '確認中用スタンプ' },
-          element: {
-            type: 'static_select',
-            action_id: 'checking_emoji_input',
-            placeholder: { type: 'plain_text', text: '絵文字を選択' },
-            options: emojiOptions,
-            initial_option: getInitialEmojiOption(settings.taskEmoji, DEFAULT_CHECKING_EMOJI),
-          },
-        },
-        {
-          type: 'input',
-          block_id: 'info_emoji_block',
-          label: { type: 'plain_text', text: '資料用スタンプ' },
-          element: {
-            type: 'static_select',
-            action_id: 'info_emoji_input',
-            placeholder: { type: 'plain_text', text: '絵文字を選択' },
-            options: emojiOptions,
-            initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI),
-          },
-        },
-        {
-          type: 'input',
-          block_id: 'checking_sort_block',
-          label: { type: 'plain_text', text: '確認中の並び替え' },
-          element: {
-            type: 'radio_buttons',
-            action_id: 'checking_sort_input',
-            options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
-            initial_option: getInitialSortOption(settings.checkingSort),
-          },
-        },
-        {
-          type: 'input',
-          block_id: 'docs_sort_block',
-          label: { type: 'plain_text', text: '資料の並び替え' },
-          element: {
-            type: 'radio_buttons',
-            action_id: 'docs_sort_input',
-            options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
-            initial_option: getInitialSortOption(settings.docsSort),
-          },
-        },
-        {
-          type: 'input',
-          block_id: 'reminder_hours_block',
-          optional: true,
-          label: { type: 'plain_text', text: 'リマインド時間を選択（複数選択可）' },
-          element: {
-            type: 'multi_static_select',
-            action_id: 'reminder_hours_input',
-            placeholder: { type: 'plain_text', text: 'リマインドする時間を選択' },
-            options: getReminderHourOptions(),
-            ...(reminderHours.length > 0
-              ? { initial_options: getInitialReminderHourOptions(reminderHours) }
-              : {}),
-          },
-        },
-      ],
-    },
+    view: buildSettingsModalView(settings, reminderTimes, homeContext),
   });
+});
+
+app.action('add_reminder_time', async ({ body, client, ack }) => {
+  await ack();
+  const metadata = parseSettingsModalMetadata(body.view.private_metadata);
+  const selectedTime = body.view.state.values.new_reminder_time_block?.new_reminder_time_input?.selected_time;
+  const parsed = parseTimepickerValue(selectedTime);
+  if (!parsed) return;
+
+  const reminderTimes = normalizeReminderTimesList([...metadata.reminderTimes, parsed]);
+  await updateSettingsModal(client, body, reminderTimes);
+});
+
+app.action('remove_reminder_time', async ({ body, client, ack, action }) => {
+  await ack();
+  const metadata = parseSettingsModalMetadata(body.view.private_metadata);
+  const index = Number(action.value);
+  const reminderTimes = metadata.reminderTimes.filter((_, i) => i !== index);
+  await updateSettingsModal(client, body, reminderTimes);
 });
 
 app.view('save_settings', async ({ view, body, client, ack }) => {
@@ -850,15 +976,14 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const infoEmoji = vals.info_emoji_block.info_emoji_input.selected_option.value;
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
   const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
-  const reminderHours =
-    vals.reminder_hours_block.reminder_hours_input.selected_options?.map((option) =>
-      Number(option.value)
-    ) || [];
-  let homeContext = { tab: 'checking', folder: 'すべて' };
-  try {
-    homeContext = JSON.parse(view.private_metadata || '{}');
-  } catch {
-    // ignore invalid metadata
+  const modalMetadata = parseSettingsModalMetadata(view.private_metadata);
+  const homeContext = { tab: modalMetadata.tab, folder: modalMetadata.folder };
+  let reminderTimes = modalMetadata.reminderTimes;
+  const pendingTime = parseTimepickerValue(
+    vals.new_reminder_time_block?.new_reminder_time_input?.selected_time
+  );
+  if (pendingTime) {
+    reminderTimes = normalizeReminderTimesList([...reminderTimes, pendingTime]);
   }
 
   const { knex } = require('./db');
@@ -887,7 +1012,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
       });
     }
   }
-  await replaceReminderHours(userId, reminderHours, teamId);
+  await replaceReminderTimes(userId, reminderTimes, teamId);
 
   const tasks = await fetchHomeTasks(userId, teamId);
   await publishHomeView(
@@ -901,12 +1026,8 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
 
   const dmChannel = await getDmChannel(client, userId);
   const reminderText =
-    reminderHours.length > 0
-      ? reminderHours
-          .slice()
-          .sort((a, b) => a - b)
-          .map((hour) => `${hour}:00`)
-          .join(', ')
+    reminderTimes.length > 0
+      ? reminderTimes.map((time) => formatReminderTime(time)).join(', ')
       : '未設定';
   const checkingSortLabel = checkingSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
   const docsSortLabel = docsSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
@@ -1085,11 +1206,13 @@ app.event('reaction_added', async ({ event, body, client }) => {
   }
 });
 
-// ─── リマインド (毎日 09:00) ──────────────────────────────────────────────────
+// ─── リマインド（毎分・カスタム時刻） ───────────────────────────────────────────
 
-cron.schedule('0 * * * *', async () => {
-  const currentHour = new Date().getHours();
-  const reminderTargets = await getUserIdsForReminderHour(currentHour);
+cron.schedule('* * * * *', async () => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const reminderTargets = await getUserIdsForReminderTime(currentHour, currentMinute);
 
   for (const { teamId, userId } of reminderTargets) {
     try {

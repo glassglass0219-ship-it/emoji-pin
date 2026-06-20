@@ -17,6 +17,7 @@ const knex = require('knex')({
 const DEFAULT_CHECKING_EMOJI = 'eyes';
 const DEFAULT_INFO_EMOJI = 'bookmark';
 const TASK_EMOJI_DEFAULT_MIGRATION = 'default_task_emoji_eyes';
+const REMINDER_MINUTE_PK_MIGRATION = 'reminder_settings_minute_primary_key';
 const DEFAULT_TEAM_ID = 'default';
 
 async function ensureColumn(tableName, columnName, addColumn) {
@@ -99,12 +100,17 @@ async function initDb() {
       t.string('team_id').notNullable().defaultTo(DEFAULT_TEAM_ID);
       t.string('user_id').notNullable();
       t.integer('hour').notNullable();
-      t.primary(['team_id', 'user_id', 'hour']);
+      t.integer('minute').notNullable().defaultTo(0);
+      t.primary(['team_id', 'user_id', 'hour', 'minute']);
     });
   }
 
   await ensureColumn('reminder_settings', 'team_id', (t) => {
     t.string('team_id').notNullable().defaultTo(DEFAULT_TEAM_ID);
+  });
+
+  await ensureColumn('reminder_settings', 'minute', (t) => {
+    t.integer('minute').notNullable().defaultTo(0);
   });
 
   const hasFolderSettings = await knex.schema.hasTable('folder_settings');
@@ -133,6 +139,13 @@ async function initDb() {
   if (!defaultMigration) {
     await knex('settings').where({ taskEmoji: 'white_check_mark' }).update({ taskEmoji: DEFAULT_CHECKING_EMOJI });
     await knex('migrations').insert({ name: TASK_EMOJI_DEFAULT_MIGRATION });
+  }
+
+  const reminderPkMigration = await knex('migrations').where({ name: REMINDER_MINUTE_PK_MIGRATION }).first();
+  if (!reminderPkMigration && (await knex.schema.hasTable('reminder_settings'))) {
+    await knex.raw('ALTER TABLE reminder_settings DROP CONSTRAINT IF EXISTS reminder_settings_pkey');
+    await knex.raw('ALTER TABLE reminder_settings ADD PRIMARY KEY (team_id, user_id, hour, minute)');
+    await knex('migrations').insert({ name: REMINDER_MINUTE_PK_MIGRATION });
   }
 
   const hasInstallations = await knex.schema.hasTable('installations');
@@ -354,25 +367,45 @@ async function updateTaskFolder(userId, taskId, folder, teamId = DEFAULT_TEAM_ID
   return knex('tasks').where({ id: taskId, userId, teamId }).first();
 }
 
-async function getReminderHours(userId, teamId = DEFAULT_TEAM_ID) {
-  const rows = await knex('reminder_settings').where({ team_id: teamId, user_id: userId }).orderBy('hour', 'asc');
-  return rows.map((row) => row.hour);
+function normalizeReminderTime(entry) {
+  const hour = Number(entry?.hour ?? entry);
+  const minute = Number(entry?.minute ?? 0);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  return { hour, minute };
 }
 
-async function replaceReminderHours(userId, hours, teamId = DEFAULT_TEAM_ID) {
-  const validHours = [...new Set(hours.map((hour) => Number(hour)).filter((hour) => Number.isInteger(hour) && hour >= 0 && hour <= 23))];
+async function getReminderTimes(userId, teamId = DEFAULT_TEAM_ID) {
+  const rows = await knex('reminder_settings')
+    .where({ team_id: teamId, user_id: userId })
+    .orderBy('hour', 'asc')
+    .orderBy('minute', 'asc');
+  return rows.map((row) => ({ hour: row.hour, minute: row.minute ?? 0 }));
+}
+
+async function replaceReminderTimes(userId, times, teamId = DEFAULT_TEAM_ID) {
+  const validTimes = [
+    ...new Map(
+      times
+        .map(normalizeReminderTime)
+        .filter(Boolean)
+        .map((time) => [`${time.hour}:${time.minute}`, time])
+    ).values(),
+  ];
 
   await knex.transaction(async (trx) => {
     await trx('reminder_settings').where({ team_id: teamId, user_id: userId }).delete();
-    if (validHours.length > 0) {
-      await trx('reminder_settings').insert(validHours.map((hour) => ({ team_id: teamId, user_id: userId, hour })));
+    if (validTimes.length > 0) {
+      await trx('reminder_settings').insert(
+        validTimes.map(({ hour, minute }) => ({ team_id: teamId, user_id: userId, hour, minute }))
+      );
     }
   });
 }
 
-async function getUserIdsForReminderHour(hour) {
+async function getUserIdsForReminderTime(hour, minute) {
   const rows = await knex('reminder_settings')
-    .where({ hour })
+    .where({ hour, minute })
     .distinct('team_id', 'user_id')
     .select('team_id', 'user_id');
   return rows.map((row) => ({ teamId: row.team_id, userId: row.user_id }));
@@ -422,9 +455,9 @@ module.exports = {
   getFolders,
   replaceFolders,
   updateTaskFolder,
-  getReminderHours,
-  replaceReminderHours,
-  getUserIdsForReminderHour,
+  getReminderTimes,
+  replaceReminderTimes,
+  getUserIdsForReminderTime,
   countPendingCheckingTasks,
   getPendingTasksOlderThan,
   getAllUserIdsWithPendingOldTasks,
