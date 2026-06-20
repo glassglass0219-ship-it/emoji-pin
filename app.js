@@ -665,6 +665,30 @@ function buildSettingsModalMetadata(homeContext, reminderTimes) {
   });
 }
 
+function isPraiseEnabledFromValues(vals) {
+  return (vals.praise_section_block?.praise_checkbox_action?.selected_options || []).some(
+    (option) => option.value === 'praise_enabled'
+  );
+}
+
+function buildPraiseSectionBlock(settings) {
+  const praiseOption = {
+    text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
+    value: 'praise_enabled',
+  };
+  return {
+    type: 'section',
+    block_id: 'praise_section_block',
+    text: { type: 'mrkdwn', text: ' ' },
+    accessory: {
+      type: 'checkboxes',
+      action_id: 'praise_checkbox_action',
+      options: [praiseOption],
+      ...(settings.praiseEnabled ? { initial_options: [praiseOption] } : {}),
+    },
+  };
+}
+
 function getSettingsFromViewOrDefaults(view, dbSettings) {
   const vals = view?.state?.values || {};
   return {
@@ -672,9 +696,9 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
     infoEmoji: vals.info_emoji_block?.info_emoji_input?.selected_option?.value || dbSettings.infoEmoji,
     checkingSort: vals.checking_sort_block?.checking_sort_input?.selected_option?.value || dbSettings.checkingSort,
     docsSort: vals.docs_sort_block?.docs_sort_input?.selected_option?.value || dbSettings.docsSort,
-    praiseEnabled: vals.praise_block?.praise_checkbox?.selected_options?.some(
-      (option) => option.value === 'praise_enabled'
-    ) ?? Boolean(dbSettings.praiseEnabled),
+    praiseEnabled: vals.praise_section_block?.praise_checkbox_action?.selected_options
+      ? isPraiseEnabledFromValues(vals)
+      : Boolean(dbSettings.praiseEnabled),
   };
 }
 
@@ -705,6 +729,7 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
         initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI),
       },
     },
+    { type: 'divider' },
     {
       type: 'input',
       block_id: 'checking_sort_block',
@@ -725,32 +750,6 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
         action_id: 'docs_sort_input',
         options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
         initial_option: getInitialSortOption(settings.docsSort),
-      },
-    },
-    {
-      type: 'input',
-      block_id: 'praise_block',
-      optional: true,
-      label: { type: 'plain_text', text: '褒めメッセージ設定', emoji: true },
-      element: {
-        type: 'checkboxes',
-        action_id: 'praise_checkbox',
-        options: [
-          {
-            text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
-            value: 'praise_enabled',
-          },
-        ],
-        ...(settings.praiseEnabled
-          ? {
-              initial_options: [
-                {
-                  text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
-                  value: 'praise_enabled',
-                },
-              ],
-            }
-          : {}),
       },
     },
     { type: 'divider' },
@@ -806,7 +805,8 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
           style: 'primary',
         },
       ],
-    }
+    },
+    buildPraiseSectionBlock(settings),
   );
 
   return blocks;
@@ -1013,9 +1013,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const infoEmoji = vals.info_emoji_block.info_emoji_input.selected_option.value;
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
   const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
-  const praiseEnabled = (vals.praise_block?.praise_checkbox?.selected_options || []).some(
-    (option) => option.value === 'praise_enabled'
-  );
+  const praiseEnabled = isPraiseEnabledFromValues(vals);
   const modalMetadata = parseSettingsModalMetadata(view.private_metadata);
   const homeContext = { tab: modalMetadata.tab, folder: modalMetadata.folder };
   let reminderTimes = modalMetadata.reminderTimes;
