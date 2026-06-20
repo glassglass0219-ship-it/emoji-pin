@@ -672,6 +672,9 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
     infoEmoji: vals.info_emoji_block?.info_emoji_input?.selected_option?.value || dbSettings.infoEmoji,
     checkingSort: vals.checking_sort_block?.checking_sort_input?.selected_option?.value || dbSettings.checkingSort,
     docsSort: vals.docs_sort_block?.docs_sort_input?.selected_option?.value || dbSettings.docsSort,
+    praiseEnabled: vals.praise_block?.praise_checkbox?.selected_options?.some(
+      (option) => option.value === 'praise_enabled'
+    ) ?? Boolean(dbSettings.praiseEnabled),
   };
 }
 
@@ -722,6 +725,32 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
         action_id: 'docs_sort_input',
         options: [toSortRadioOption('desc'), toSortRadioOption('asc')],
         initial_option: getInitialSortOption(settings.docsSort),
+      },
+    },
+    {
+      type: 'input',
+      block_id: 'praise_block',
+      optional: true,
+      label: { type: 'plain_text', text: '褒めメッセージ設定', emoji: true },
+      element: {
+        type: 'checkboxes',
+        action_id: 'praise_checkbox',
+        options: [
+          {
+            text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
+            value: 'praise_enabled',
+          },
+        ],
+        ...(settings.praiseEnabled
+          ? {
+              initial_options: [
+                {
+                  text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
+                  value: 'praise_enabled',
+                },
+              ],
+            }
+          : {}),
       },
     },
     { type: 'divider' },
@@ -984,6 +1013,9 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const infoEmoji = vals.info_emoji_block.info_emoji_input.selected_option.value;
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
   const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
+  const praiseEnabled = (vals.praise_block?.praise_checkbox?.selected_options || []).some(
+    (option) => option.value === 'praise_enabled'
+  );
   const modalMetadata = parseSettingsModalMetadata(view.private_metadata);
   const homeContext = { tab: modalMetadata.tab, folder: modalMetadata.folder };
   let reminderTimes = modalMetadata.reminderTimes;
@@ -1002,13 +1034,14 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
       infoEmoji,
       checkingSort,
       docsSort,
+      praiseEnabled,
     });
   } else {
     const legacySettings = await knex('settings').where({ teamId: 'default', userId }).first();
     if (legacySettings) {
       await knex('settings')
         .where({ teamId: 'default', userId })
-        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort });
+        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort, praiseEnabled });
     } else {
       await knex('settings').insert({
         teamId,
@@ -1017,6 +1050,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
         infoEmoji,
         checkingSort,
         docsSort,
+        praiseEnabled,
       });
     }
   }
@@ -1039,9 +1073,10 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
       : '未設定';
   const checkingSortLabel = checkingSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
   const docsSortLabel = docsSort === 'asc' ? '古い順（昇順）' : '新しい順（降順）';
+  const praiseLabel = praiseEnabled ? 'オン' : 'オフ';
   await client.chat.postMessage({
     channel: dmChannel,
-    text: `✅ ${APP_NAME} の環境設定を保存しました！\n• 確認中用: :${checkingEmoji}:\n• 資料用: :${infoEmoji}:\n• 確認中の並び替え: ${checkingSortLabel}\n• 資料の並び替え: ${docsSortLabel}\n• リマインド時間: ${reminderText}`,
+    text: `✅ ${APP_NAME} の環境設定を保存しました！\n• 確認中用: :${checkingEmoji}:\n• 資料用: :${infoEmoji}:\n• 確認中の並び替え: ${checkingSortLabel}\n• 資料の並び替え: ${docsSortLabel}\n• 褒めメッセージ: ${praiseLabel}\n• リマインド時間: ${reminderText}`,
   });
 });
 
