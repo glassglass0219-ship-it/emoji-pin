@@ -45,6 +45,7 @@ async function initDb() {
       t.string('folder').notNullable().defaultTo('未分類');
       t.string('status').notNullable().defaultTo('pending'); // pending | completed
       t.timestamp('createdAt').defaultTo(knex.fn.now());
+      t.timestamp('completedAt');
     });
   }
 
@@ -62,6 +63,10 @@ async function initDb() {
 
   await ensureColumn('tasks', 'user_icon', (t) => {
     t.string('user_icon');
+  });
+
+  await ensureColumn('tasks', 'completedAt', (t) => {
+    t.timestamp('completedAt');
   });
 
   const hasFolderColumn = await knex.schema.hasColumn('tasks', 'folder');
@@ -92,6 +97,10 @@ async function initDb() {
 
   await ensureColumn('settings', 'docsSort', (t) => {
     t.string('docsSort').defaultTo('desc');
+  });
+
+  await ensureColumn('settings', 'praiseEnabled', (t) => {
+    t.boolean('praiseEnabled').notNullable().defaultTo(false);
   });
 
   const hasReminderSettings = await knex.schema.hasTable('reminder_settings');
@@ -249,6 +258,7 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
       infoEmoji: DEFAULT_INFO_EMOJI,
       checkingSort: 'desc',
       docsSort: 'desc',
+      praiseEnabled: false,
     });
     row = await knex('settings').where({ userId, teamId }).first();
   }
@@ -282,7 +292,38 @@ async function completeTask({ teamId = DEFAULT_TEAM_ID, messageTs, channelId, ta
   } else {
     query.where({ messageTs, channelId });
   }
-  return query.update({ status: 'completed' });
+  return query.update({ status: 'completed', completedAt: knex.fn.now() });
+}
+
+function getStartOfTodayJst() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year').value;
+  const month = parts.find((p) => p.type === 'month').value;
+  const day = parts.find((p) => p.type === 'day').value;
+  return new Date(`${year}-${month}-${day}T00:00:00+09:00`);
+}
+
+async function getTodayDoneCount(userId, teamId = DEFAULT_TEAM_ID) {
+  const startOfToday = getStartOfTodayJst();
+  const row = await knex('tasks')
+    .where({ teamId, userId, status: 'completed' })
+    .whereNotNull('completedAt')
+    .where('"completedAt"', '>=', startOfToday)
+    .count({ count: '*' })
+    .first();
+  return Number(row?.count || 0);
+}
+
+async function getPraiseEnabledUsers() {
+  const rows = await knex('settings')
+    .where({ praiseEnabled: true })
+    .select('teamId', 'userId');
+  return rows.map((row) => ({ teamId: row.teamId, userId: row.userId }));
 }
 
 async function getPendingTasks(userId, teamId = DEFAULT_TEAM_ID) {
@@ -460,6 +501,8 @@ module.exports = {
   replaceReminderTimes,
   getUserIdsForReminderTime,
   countPendingCheckingTasks,
+  getTodayDoneCount,
+  getPraiseEnabledUsers,
   getPendingTasksOlderThan,
   getAllUserIdsWithPendingOldTasks,
 };
