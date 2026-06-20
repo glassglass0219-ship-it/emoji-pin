@@ -260,12 +260,9 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
   const renderItems = (items, totalCount) => {
     if (items.length === 0) return [];
     const section = [];
-    const spacerBlock = {
-      type: 'section',
-      text: { type: 'mrkdwn', text: '\u200B' },
-    };
+    const defaultUserIcon = 'https://api.slack.com/img/blocks/breadcrumbs/avatar.png';
 
-    items.forEach((t, index) => {
+    items.forEach((t) => {
       const link = `https://slack.com/archives/${t.channelId}/p${t.messageTs.replace('.', '')}`;
       const createdAt = new Date(t.createdAt).toLocaleString('ja-JP', {
         year: 'numeric',
@@ -274,83 +271,92 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         hour: '2-digit',
         minute: '2-digit',
       }).replace(/\//g, '.');
-      if (index > 0) section.push(spacerBlock);
+      const displayUser = t.itemUser || t.userId;
+      const iconUrl = t.user_icon || t.userIcon || defaultUserIcon;
+
       section.push({ type: 'divider' });
-      section.push(spacerBlock);
+
+      const cardSection = {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*<@${displayUser}>*\n${t.text || '(テキストなし)'}`,
+        },
+      };
+
+      if (!isDoneTab) {
+        cardSection.accessory = {
+          type: 'button',
+          text: { type: 'plain_text', text: '✅ Done', emoji: true },
+          style: 'primary',
+          action_id: 'complete_task',
+          value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
+        };
+      }
+
+      section.push(cardSection);
+
       section.push({
         type: 'context',
         elements: [
           {
             type: 'image',
-            image_url: t.user_icon || t.userIcon || 'https://api.slack.com/img/blocks/base/plants/plant1.png',
-            alt_text: 'user_icon',
+            image_url: iconUrl,
+            alt_text: 'user',
           },
           {
             type: 'mrkdwn',
-            text: `*<@${t.itemUser || t.userId}>*`,
+            text: `🕒 ${createdAt}  |  <${link}|メッセージを表示>`,
           },
         ],
       });
-      section.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: t.text || '(テキストなし)',
-        },
-      });
-      section.push({
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: `🕒 ${createdAt}  ·  <${link}|🔗 メッセージを表示>`,
-          },
-        ],
-      });
-      const actionElements = [];
-      if (isDoneTab) {
-        actionElements.push(
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '🔄 確認中に戻す', emoji: true },
-            action_id: 'reopen_to_checking',
-            value: JSON.stringify({ taskId: t.id }),
-          },
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
-            action_id: 'reopen_to_info',
-            value: JSON.stringify({ taskId: t.id }),
-          },
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-            style: 'danger',
-            action_id: 'delete_item',
-            value: JSON.stringify({ taskId: t.id }),
-          }
-        );
-      } else {
-        if (isInfoTab) {
-          actionElements.push({
-            type: 'button',
-            text: { type: 'plain_text', text: '📁 移動', emoji: true },
-            action_id: 'open_move_folder_modal',
-            value: JSON.stringify({ taskId: t.id, folder: t.folder || '未分類' }),
-          });
-        }
-        actionElements.push({
-          type: 'button',
-          text: { type: 'plain_text', text: '✅ Done', emoji: true },
-          action_id: 'complete_task',
-          value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
+
+      if (isInfoTab) {
+        section.push({
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '📁 移動', emoji: true },
+              action_id: 'open_move_folder_modal',
+              value: JSON.stringify({ taskId: t.id, folder: t.folder || '未分類' }),
+            },
+          ],
         });
       }
-      section.push({
-        type: 'actions',
-        elements: actionElements,
-      });
+
+      if (isDoneTab) {
+        section.push({
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '🔄 確認中に戻す', emoji: true },
+              action_id: 'reopen_to_checking',
+              value: JSON.stringify({ taskId: t.id }),
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '🔄 資料に戻す', emoji: true },
+              action_id: 'reopen_to_info',
+              value: JSON.stringify({ taskId: t.id }),
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+              style: 'danger',
+              action_id: 'delete_item',
+              value: JSON.stringify({ taskId: t.id }),
+            },
+          ],
+        });
+      }
     });
+
+    if (items.length > 0) {
+      section.push({ type: 'divider' });
+    }
+
     if (totalCount > items.length) {
       section.push({
         type: 'context',
