@@ -10,7 +10,6 @@ const REQUIRED_BOT_SCOPES = [
   'chat:write',
   'reactions:read',
   'users:read',
-  'emoji:read',
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
@@ -69,7 +68,7 @@ const receiver = new ExpressReceiver({
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET || 'emoji-pin-default-state-secret',
-  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read', 'emoji:read'],
+  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read'],
   installationStore: {
     storeInstallation: async (installation) => {
       const teamId = installation.team?.id || installation.enterprise?.id;
@@ -595,112 +594,12 @@ async function joinAllPublicChannels(client, botToken) {
 
 const DEFAULT_CHECKING_EMOJI = 'eyes';
 const DEFAULT_INFO_EMOJI = 'bookmark';
-const MAX_EMOJI_SELECT_OPTIONS = 100;
 
-const businessEmojiOptions = [
-  { icon: '✅', name: 'white_check_mark' },
-  { icon: '🚩', name: 'triangular_flag_on_post' },
-  { icon: '📝', name: 'memo' },
-  { icon: '👀', name: 'eyes' },
-  { icon: '🔖', name: 'bookmark' },
-  { icon: '📂', name: 'open_file_folder' },
-  { icon: '📎', name: 'paperclip' },
-  { icon: '🆗', name: 'ok' },
-  { icon: '🏁', name: 'checkered_flag' },
-  { icon: '🎯', name: 'dart' },
-  { icon: '💡', name: 'bulb' },
-];
-
-function toSlackSelectOption(option) {
-  return {
-    text: { type: 'plain_text', text: `${option.icon} ${option.name}`, emoji: true },
-    value: option.name,
-  };
-}
-
-function toCustomEmojiSelectOption(name) {
-  return {
-    text: { type: 'plain_text', text: `:${name}: ${name}` },
-    value: name,
-  };
-}
-
-function buildEmojiSelectOptions(customEmojiNames = [], ensureNames = []) {
-  const standardOptions = businessEmojiOptions.map(toSlackSelectOption);
-  const standardNames = new Set(businessEmojiOptions.map((option) => option.name));
-  const options = [...standardOptions];
-  const used = new Set(standardNames);
-
-  const addOption = (name, option) => {
-    if (!name || used.has(name) || options.length >= MAX_EMOJI_SELECT_OPTIONS) return;
-    options.push(option);
-    used.add(name);
-  };
-
-  for (const name of [...new Set((ensureNames || []).filter(Boolean))].sort((a, b) => a.localeCompare(b))) {
-    if (standardNames.has(name)) continue;
-    addOption(name, toCustomEmojiSelectOption(name));
-  }
-
-  for (const name of [...new Set(customEmojiNames || [])]
-    .filter((emojiName) => emojiName && !standardNames.has(emojiName))
-    .sort((a, b) => a.localeCompare(b))) {
-    addOption(name, toCustomEmojiSelectOption(name));
-  }
-
-  return options;
-}
-
-function getStoredCustomEmojiNames(customEmojiNames, settings = {}) {
-  const standardNames = new Set(businessEmojiOptions.map((option) => option.name));
-  const included = new Set();
-
-  for (const name of [settings.taskEmoji, settings.infoEmoji]) {
-    if (name && !standardNames.has(name)) included.add(name);
-  }
-
-  for (const name of [...new Set(customEmojiNames || [])]
-    .filter((emojiName) => emojiName && !standardNames.has(emojiName))
-    .sort((a, b) => a.localeCompare(b))) {
-    if (included.size >= MAX_EMOJI_SELECT_OPTIONS - businessEmojiOptions.length) break;
-    included.add(name);
-  }
-
-  return [...included].sort((a, b) => a.localeCompare(b));
-}
-
-async function fetchWorkspaceCustomEmojiNames(client, teamId, botToken) {
-  const names = new Set();
-  let cursor;
-
-  try {
-    do {
-      const response = await client.emoji.list(withBotToken(
-        cursor ? { team_id: teamId, cursor } : { team_id: teamId },
-        botToken
-      ));
-      for (const name of Object.keys(response.emoji || {})) {
-        if (name) names.add(name);
-      }
-      cursor = response.response_metadata?.next_cursor;
-    } while (cursor);
-  } catch (error) {
-    console.warn(
-      `[${APP_NAME}] カスタム絵文字一覧の取得に失敗しました:`,
-      error?.data?.error || error.message
-    );
-  }
-
-  return [...names].sort((a, b) => a.localeCompare(b));
-}
-
-function getInitialEmojiOption(savedValue, fallbackValue, emojiOptions) {
-  return (
-    emojiOptions.find((option) => option.value === savedValue)
-    || emojiOptions.find((option) => option.value === fallbackValue)
-    || emojiOptions.find((option) => option.value === DEFAULT_CHECKING_EMOJI)
-    || emojiOptions[0]
-  );
+function normalizeEmojiName(value, fallback) {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/:/g, '');
+  return normalized || fallback;
 }
 
 function formatReminderTime({ hour, minute }) {
@@ -736,19 +635,17 @@ function parseSettingsModalMetadata(privateMetadata) {
       tab: parsed.tab || 'checking',
       folder: parsed.folder || 'すべて',
       reminderTimes: normalizeReminderTimesList(parsed.reminderTimes || []),
-      customEmojiNames: Array.isArray(parsed.customEmojiNames) ? parsed.customEmojiNames : [],
     };
   } catch {
-    return { tab: 'checking', folder: 'すべて', reminderTimes: [], customEmojiNames: [] };
+    return { tab: 'checking', folder: 'すべて', reminderTimes: [] };
   }
 }
 
-function buildSettingsModalMetadata(homeContext, reminderTimes, customEmojiNames = []) {
+function buildSettingsModalMetadata(homeContext, reminderTimes) {
   return JSON.stringify({
     tab: homeContext.tab || 'checking',
     folder: homeContext.folder || 'すべて',
     reminderTimes: normalizeReminderTimesList(reminderTimes),
-    customEmojiNames: customEmojiNames || [],
   });
 }
 
@@ -779,8 +676,14 @@ function buildPraiseSectionBlock(settings) {
 function getSettingsFromViewOrDefaults(view, dbSettings) {
   const vals = view?.state?.values || {};
   return {
-    taskEmoji: vals.checking_emoji_block?.checking_emoji_input?.selected_option?.value || dbSettings.taskEmoji,
-    infoEmoji: vals.info_emoji_block?.info_emoji_input?.selected_option?.value || dbSettings.infoEmoji,
+    taskEmoji: normalizeEmojiName(
+      vals.checking_emoji_block?.checking_emoji_input?.value,
+      dbSettings.taskEmoji || DEFAULT_CHECKING_EMOJI
+    ),
+    infoEmoji: normalizeEmojiName(
+      vals.info_emoji_block?.info_emoji_input?.value,
+      dbSettings.infoEmoji || DEFAULT_INFO_EMOJI
+    ),
     checkingSort: vals.checking_sort_block?.checking_sort_input?.selected_option?.value || dbSettings.checkingSort,
     docsSort: vals.docs_sort_block?.docs_sort_input?.selected_option?.value || dbSettings.docsSort,
     praiseEnabled: vals.praise_section_block?.praise_checkbox_action?.selected_options
@@ -789,20 +692,17 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
   };
 }
 
-function buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames = []) {
-  const checkingEmojiOptions = buildEmojiSelectOptions(customEmojiNames, [settings.taskEmoji]);
-  const infoEmojiOptions = buildEmojiSelectOptions(customEmojiNames, [settings.infoEmoji]);
+function buildSettingsModalBlocks(settings, reminderTimes) {
   const blocks = [
     {
       type: 'input',
       block_id: 'checking_emoji_block',
       label: { type: 'plain_text', text: '確認中用スタンプ' },
       element: {
-        type: 'static_select',
+        type: 'plain_text_input',
         action_id: 'checking_emoji_input',
-        placeholder: { type: 'plain_text', text: '絵文字を選択' },
-        options: checkingEmojiOptions,
-        initial_option: getInitialEmojiOption(settings.taskEmoji, DEFAULT_CHECKING_EMOJI, checkingEmojiOptions),
+        placeholder: { type: 'plain_text', text: 'eyes や bookmark など、絵文字名をコロンなしで入力' },
+        initial_value: settings.taskEmoji || DEFAULT_CHECKING_EMOJI,
       },
     },
     {
@@ -810,12 +710,15 @@ function buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames = []
       block_id: 'info_emoji_block',
       label: { type: 'plain_text', text: '資料用スタンプ' },
       element: {
-        type: 'static_select',
+        type: 'plain_text_input',
         action_id: 'info_emoji_input',
-        placeholder: { type: 'plain_text', text: '絵文字を選択' },
-        options: infoEmojiOptions,
-        initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI, infoEmojiOptions),
+        placeholder: { type: 'plain_text', text: 'eyes や bookmark など、絵文字名をコロンなしで入力' },
+        initial_value: settings.infoEmoji || DEFAULT_INFO_EMOJI,
       },
+    },
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: '※ワークスペース独自の絵文字名も入力可能です' }],
     },
     { type: 'divider' },
     {
@@ -900,16 +803,15 @@ function buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames = []
   return blocks;
 }
 
-function buildSettingsModalView(settings, reminderTimes, homeContext, customEmojiNames = []) {
-  const storedCustomEmojiNames = getStoredCustomEmojiNames(customEmojiNames, settings);
+function buildSettingsModalView(settings, reminderTimes, homeContext) {
   return {
     type: 'modal',
     callback_id: 'save_settings',
-    private_metadata: buildSettingsModalMetadata(homeContext, reminderTimes, storedCustomEmojiNames),
+    private_metadata: buildSettingsModalMetadata(homeContext, reminderTimes),
     title: { type: 'plain_text', text: '環境設定' },
     submit: { type: 'plain_text', text: '保存' },
     close: { type: 'plain_text', text: 'キャンセル' },
-    blocks: buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames),
+    blocks: buildSettingsModalBlocks(settings, reminderTimes),
   };
 }
 
@@ -925,7 +827,7 @@ async function updateSettingsModal(client, body, reminderTimes) {
     view: buildSettingsModalView(settings, reminderTimes, {
       tab: metadata.tab,
       folder: metadata.folder,
-    }, metadata.customEmojiNames),
+    }),
   });
 }
 
@@ -1068,13 +970,9 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
   } catch {
     // legacy button value
   }
-  const botToken = await getInstallationBotToken(teamId);
-  const customEmojiNames = botToken
-    ? await fetchWorkspaceCustomEmojiNames(client, teamId, botToken)
-    : [];
   await client.views.open({
     trigger_id: body.trigger_id,
-    view: buildSettingsModalView(settings, reminderTimes, homeContext, customEmojiNames),
+    view: buildSettingsModalView(settings, reminderTimes, homeContext),
   });
 });
 
@@ -1102,8 +1000,14 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const vals = view.state.values;
   const userId = body.user.id;
   const teamId = getTeamId(body);
-  const checkingEmoji = vals.checking_emoji_block.checking_emoji_input.selected_option.value;
-  const infoEmoji = vals.info_emoji_block.info_emoji_input.selected_option.value;
+  const checkingEmoji = normalizeEmojiName(
+    vals.checking_emoji_block.checking_emoji_input.value,
+    DEFAULT_CHECKING_EMOJI
+  );
+  const infoEmoji = normalizeEmojiName(
+    vals.info_emoji_block.info_emoji_input.value,
+    DEFAULT_INFO_EMOJI
+  );
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
   const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
   const praiseEnabled = isPraiseEnabledFromValues(vals);
