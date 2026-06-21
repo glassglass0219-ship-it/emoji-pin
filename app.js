@@ -102,6 +102,11 @@ const receiver = new ExpressReceiver({
   },
 });
 
+// app.js に追加（UptimeRobotからのアクセスを受け付けるため）
+receiver.app.get('/', (req, res) => {
+  res.send('Emoji Pin is awake! 🚀');
+});
+
 // 2. Appの作成（receiverを必ず渡す）
 const app = new App({
   receiver: receiver, // これを渡すとOAuthモードとして起動しようとします
