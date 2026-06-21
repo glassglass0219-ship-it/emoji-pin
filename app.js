@@ -814,7 +814,7 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
     { type: 'divider' },
     {
       type: 'section',
-      text: { type: 'plain_text', text: 'リマインド時刻' },
+      text: { type: 'mrkdwn', text: '*リマインド時刻*' },
     },
   ];
 
@@ -840,10 +840,13 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
 
   blocks.push(
     {
+      type: 'section',
+      text: { type: 'mrkdwn', text: '追加する時刻 (任意)' },
+    },
+    {
       type: 'input',
       block_id: 'new_reminder_time_block',
-      optional: true,
-      label: { type: 'plain_text', text: '追加する時刻（任意）' },
+      label: { type: 'plain_text', text: ' ' },
       element: {
         type: 'timepicker',
         action_id: 'new_reminder_time_input',
