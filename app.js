@@ -704,6 +704,31 @@ function isPraiseEnabledFromValues(vals) {
   );
 }
 
+function isRemindersEnabledFromValues(vals) {
+  return (vals.reminders_enabled_section_block?.reminders_enabled_checkbox_action?.selected_options || []).some(
+    (option) => option.value === 'reminders_enabled'
+  );
+}
+
+function buildRemindersEnabledSectionBlock(settings) {
+  const remindersOption = {
+    text: { type: 'plain_text', text: 'リマインドを通知する', emoji: true },
+    value: 'reminders_enabled',
+  };
+  const remindersEnabled = settings.remindersEnabled !== false;
+  return {
+    type: 'section',
+    block_id: 'reminders_enabled_section_block',
+    text: { type: 'mrkdwn', text: ' ' },
+    accessory: {
+      type: 'checkboxes',
+      action_id: 'reminders_enabled_checkbox_action',
+      options: [remindersOption],
+      ...(remindersEnabled ? { initial_options: [remindersOption] } : {}),
+    },
+  };
+}
+
 function buildPraiseSectionBlock(settings) {
   const praiseOption = {
     text: { type: 'plain_text', text: 'いっぱい頑張ったら褒められたい人用', emoji: true },
@@ -742,6 +767,9 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
     praiseEnabled: vals.praise_section_block?.praise_checkbox_action?.selected_options
       ? isPraiseEnabledFromValues(vals)
       : Boolean(dbSettings.praiseEnabled),
+    remindersEnabled: vals.reminders_enabled_section_block?.reminders_enabled_checkbox_action?.selected_options
+      ? isRemindersEnabledFromValues(vals)
+      : dbSettings.remindersEnabled !== false,
   };
 }
 
@@ -821,6 +849,7 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
       type: 'section',
       text: { type: 'mrkdwn', text: '*リマインド時刻*' },
     },
+    buildRemindersEnabledSectionBlock(settings),
   ];
 
   if (reminderTimes.length === 0) {
@@ -1045,34 +1074,50 @@ function buildUsageModalView() {
       { type: 'divider' },
       {
         type: 'section',
-        text: {
+        text: { type: 'mrkdwn', text: '*📌 忘れないうちに保存！*' },
+      },
+      {
+        type: 'context',
+        elements: [{
           type: 'mrkdwn',
-          text: '*📌 忘れないうちに保存！*\n\n　 投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\n　 スタンプは用途で使い分けて、別リストで管理できます。\n\n　 確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！',
-        },
+          text: '投稿にスタンプを付けるだけで、あなた専用のリストが完成します。スタンプは用途で使い分けて、別リストで管理できます。確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！',
+        }],
       },
       { type: 'divider' },
       {
         type: 'section',
-        text: {
+        text: { type: 'mrkdwn', text: '*✅ 終わったらスッキリ！*' },
+      },
+      {
+        type: 'context',
+        elements: [{
           type: 'mrkdwn',
-          text: '*✅ 終わったらスッキリ！*\n\n　 完了したタスクは *[✅ Done]* を押してDONEタブに送りましょう。\n　 DONEタブから元タブへの復元も可能です。',
-        },
+          text: '完了したタスクは [✅ Done] を押してDONEタブに送りましょう。DONEタブから元タブへの復元も可能です。',
+        }],
       },
       { type: 'divider' },
       {
         type: 'section',
-        text: {
+        text: { type: 'mrkdwn', text: '*⚙️ あなた専用に調整*' },
+      },
+      {
+        type: 'context',
+        elements: [{
           type: 'mrkdwn',
-          text: '*⚙️ あなた専用に調整*\n\n　 お好みのスタンプやリマインドは *[⚙️ 設定]* から変更可能。\n　 リマインドは終業1時間前など余裕をもって設定するのがオススメ。\n　 確認タスクが毎日0件になるのを目指しましょう！',
-        },
+          text: 'お好みのスタンプやリマインドは [⚙️ 設定] から変更可能。リマインドは終業1時間前など余裕をもって設定するのがオススメです。',
+        }],
       },
       { type: 'divider' },
       {
         type: 'section',
-        text: {
+        text: { type: 'mrkdwn', text: '*💡 重要*' },
+      },
+      {
+        type: 'context',
+        elements: [{
           type: 'mrkdwn',
-          text: '*💡 重要*\n\nEmoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルームに `/invite @Emoji Pin` と投稿し、botを招待してください！',
-        },
+          text: 'Emoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。リスト化してほしいルームに `/invite @Emoji Pin` と投稿し、招待してください！',
+        }],
       },
     ],
   };
@@ -1142,6 +1187,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
   const docsSort = normalizeSort(vals.docs_sort_block.docs_sort_input.selected_option?.value);
   const praiseEnabled = isPraiseEnabledFromValues(vals);
+  const remindersEnabled = isRemindersEnabledFromValues(vals);
   const modalMetadata = parseSettingsModalMetadata(view.private_metadata);
   const homeContext = { tab: modalMetadata.tab, folder: modalMetadata.folder };
   let reminderTimes = modalMetadata.reminderTimes;
@@ -1162,13 +1208,14 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
       docsSort,
       praiseEnabled,
       customEmojiList,
+      remindersEnabled,
     });
   } else {
     const legacySettings = await knex('settings').where({ teamId: 'default', userId }).first();
     if (legacySettings) {
       await knex('settings')
         .where({ teamId: 'default', userId })
-        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort, praiseEnabled, customEmojiList });
+        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort, praiseEnabled, customEmojiList, remindersEnabled });
     } else {
       await knex('settings').insert({
         teamId,
@@ -1179,6 +1226,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
         docsSort,
         praiseEnabled,
         customEmojiList,
+        remindersEnabled,
       });
     }
   }

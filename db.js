@@ -108,8 +108,16 @@ async function initDb() {
     t.text('customEmojiList').defaultTo(DEFAULT_CUSTOM_EMOJI_LIST);
   });
 
+  await ensureColumn('settings', 'remindersEnabled', (t) => {
+    t.boolean('remindersEnabled').notNullable().defaultTo(true);
+  });
+
   if (await knex.schema.hasColumn('settings', 'customEmojiList')) {
     await knex('settings').whereNull('customEmojiList').update({ customEmojiList: DEFAULT_CUSTOM_EMOJI_LIST });
+  }
+
+  if (await knex.schema.hasColumn('settings', 'remindersEnabled')) {
+    await knex('settings').whereNull('remindersEnabled').update({ remindersEnabled: true });
   }
 
   const hasReminderSettings = await knex.schema.hasTable('reminder_settings');
@@ -269,11 +277,15 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
       docsSort: 'desc',
       praiseEnabled: false,
       customEmojiList: DEFAULT_CUSTOM_EMOJI_LIST,
+      remindersEnabled: true,
     });
     row = await knex('settings').where({ userId, teamId }).first();
   }
   if (!row.customEmojiList) {
     row.customEmojiList = DEFAULT_CUSTOM_EMOJI_LIST;
+  }
+  if (row.remindersEnabled == null) {
+    row.remindersEnabled = true;
   }
   return row;
 }
@@ -459,10 +471,14 @@ async function replaceReminderTimes(userId, times, teamId = DEFAULT_TEAM_ID) {
 }
 
 async function getUserIdsForReminderTime(hour, minute) {
-  const rows = await knex('reminder_settings')
-    .where({ hour, minute })
-    .distinct('team_id', 'user_id')
-    .select('team_id', 'user_id');
+  const rows = await knex('reminder_settings as rs')
+    .join('settings as s', function joinSettings() {
+      this.on('rs.team_id', '=', 's.teamId').andOn('rs.user_id', '=', 's.userId');
+    })
+    .where({ 'rs.hour': hour, 'rs.minute': minute })
+    .where('s.remindersEnabled', true)
+    .distinct('rs.team_id', 'rs.user_id')
+    .select('rs.team_id', 'rs.user_id');
   return rows.map((row) => ({ teamId: row.team_id, userId: row.user_id }));
 }
 
