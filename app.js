@@ -195,21 +195,18 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           text: { type: 'plain_text', text: `👀 確認中 (${checkingItems.length})`, emoji: true },
           action_id: 'switch_tab_checking',
           value: 'checking',
-          ...(isCheckingTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: `📖 資料 (${infoItems.length})`, emoji: true },
           action_id: 'switch_tab_info',
           value: 'info',
-          ...(isInfoTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: '✅ DONE', emoji: true },
           action_id: 'switch_tab_done',
           value: 'done',
-          ...(isDoneTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
@@ -240,7 +237,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         text: { type: 'plain_text', text: folder, emoji: true },
         action_id: `switch_folder_${index}`,
         value: folder,
-        ...(folder === safeSelectedFolder ? { style: 'primary' } : {}),
       })),
     ];
 
@@ -261,7 +257,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         {
           type: 'button',
           text: { type: 'plain_text', text: '💥 DONEを一括削除', emoji: true },
-          style: 'primary',
           action_id: 'clear_all_done',
           value: 'done',
           confirm: {
@@ -340,7 +335,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '✅ Done', emoji: true },
-            style: 'primary',
             action_id: 'complete_task',
             value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
           },
@@ -355,14 +349,12 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '📁 フォルダを移動', emoji: true },
-            style: 'primary',
             action_id: 'open_move_folder_modal',
             value: JSON.stringify({ taskId: t.id, folder: folderName }),
           },
           {
             type: 'button',
             text: { type: 'plain_text', text: '✅ Done', emoji: true },
-            style: 'primary',
             action_id: 'complete_task',
             value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
           },
@@ -377,14 +369,12 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '🔄 タブへ戻す', emoji: true },
-            style: 'primary',
             action_id: 'restore_item',
             value: JSON.stringify({ taskId: t.id }),
           },
           {
             type: 'button',
             text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-            style: 'primary',
             action_id: 'delete_item',
             value: JSON.stringify({ taskId: t.id }),
           },
@@ -1217,7 +1207,7 @@ function buildUsageModalView() {
       { type: 'divider' },
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: '*⚙️ あなた専用に調整*' },
+        text: { type: 'mrkdwn', text: '*⚙️ あなた専用にカスタマイズ*' },
       },
       {
         type: 'context',
