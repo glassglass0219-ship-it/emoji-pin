@@ -298,24 +298,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
     };
 
-    if (isCheckingTab || isInfoTab) {
-      cardSection.accessory = {
-        type: 'button',
-        text: { type: 'plain_text', text: '✅ Done', emoji: true },
-        style: 'primary',
-        action_id: 'complete_task',
-        value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
-      };
-    } else if (isDoneTab) {
-      cardSection.accessory = {
-        type: 'button',
-        text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-        style: 'primary',
-        action_id: 'delete_item',
-        value: JSON.stringify({ taskId: t.id }),
-      };
-    }
-
     cardBlocks.push(cardSection);
 
     const imageBlock = buildTaskImageBlock(t.imageUrl, link);
@@ -327,9 +309,9 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     if (isCheckingTab) {
       metaText = `🕒 ${createdAt}  |  [${ageLabel}]  |  <${link}|🔗 メッセージを表示>`;
     } else if (isInfoTab) {
-      metaText = `🕒 ${createdAt}  |  [${ageLabel}]  |  📁 ${folderName}`;
+      metaText = `🕒 ${createdAt}  |  📁 ${folderName}  |  <${link}|🔗 メッセージを表示>`;
     } else {
-      metaText = `🕒 ${createdAt}`;
+      metaText = `🕒 ${createdAt}  |  <${link}|🔗 メッセージを表示>`;
     }
 
     cardBlocks.push({
@@ -351,12 +333,20 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       ],
     });
 
-    const messageLinkButton = {
-      type: 'button',
-      text: { type: 'plain_text', text: '🔗 メッセージを表示', emoji: true },
-      url: link,
-      action_id: `open_message_link_${t.id}`,
-    };
+    if (isCheckingTab) {
+      cardBlocks.push({
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '✅ Done', emoji: true },
+            style: 'primary',
+            action_id: 'complete_task',
+            value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
+          },
+        ],
+      });
+    }
 
     if (isInfoTab) {
       cardBlocks.push({
@@ -365,10 +355,17 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '📁 フォルダを移動', emoji: true },
+            style: 'primary',
             action_id: 'open_move_folder_modal',
             value: JSON.stringify({ taskId: t.id, folder: folderName }),
           },
-          messageLinkButton,
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '✅ Done', emoji: true },
+            style: 'primary',
+            action_id: 'complete_task',
+            value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
+          },
         ],
       });
     }
@@ -380,10 +377,17 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           {
             type: 'button',
             text: { type: 'plain_text', text: '🔄 タブへ戻す', emoji: true },
+            style: 'primary',
             action_id: 'restore_item',
             value: JSON.stringify({ taskId: t.id }),
           },
-          messageLinkButton,
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+            style: 'primary',
+            action_id: 'delete_item',
+            value: JSON.stringify({ taskId: t.id }),
+          },
         ],
       });
     }
