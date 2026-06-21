@@ -289,18 +289,32 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     }).replace(/\//g, '.');
     const displayUser = t.itemUser || t.userId;
     const iconUrl = t.user_icon || t.userIcon || defaultUserIcon;
+    const folderName = t.folder || '未分類';
+    const ageLabel = formatAddedAgeLabel(t.createdAt);
     const cardBlocks = [{ type: 'divider' }];
-
-    let bodyText = '';
-    if (isInfoTab) {
-      bodyText += `📁 ${t.folder || '未分類'}\n`;
-    }
-    bodyText += t.text || '(テキストなし)';
 
     const cardSection = {
       type: 'section',
-      text: { type: 'mrkdwn', text: bodyText },
+      text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
     };
+
+    if (isCheckingTab || isInfoTab) {
+      cardSection.accessory = {
+        type: 'button',
+        text: { type: 'plain_text', text: '✅ Done', emoji: true },
+        style: 'primary',
+        action_id: 'complete_task',
+        value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
+      };
+    } else if (isDoneTab) {
+      cardSection.accessory = {
+        type: 'button',
+        text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
+        style: 'primary',
+        action_id: 'delete_item',
+        value: JSON.stringify({ taskId: t.id }),
+      };
+    }
 
     cardBlocks.push(cardSection);
 
@@ -309,10 +323,14 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       cardBlocks.push(imageBlock);
     }
 
-    const ageLabel = formatAddedAgeLabel(t.createdAt);
-    const metaText = isCheckingTab
-      ? `🕒 ${createdAt}  |  [${ageLabel}]  |  🔗 <${link}|メッセージを表示>`
-      : `🕒 ${createdAt}  |  🔗 <${link}|メッセージを表示>`;
+    let metaText;
+    if (isCheckingTab) {
+      metaText = `🕒 ${createdAt}  |  [${ageLabel}]  |  <${link}|🔗 メッセージを表示>`;
+    } else if (isInfoTab) {
+      metaText = `🕒 ${createdAt}  |  [${ageLabel}]  |  📁 ${folderName}`;
+    } else {
+      metaText = `🕒 ${createdAt}`;
+    }
 
     cardBlocks.push({
       type: 'context',
@@ -333,26 +351,25 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       ],
     });
 
-    if (isCheckingTab || isInfoTab) {
-      const actionElements = [];
-      if (isInfoTab) {
-        actionElements.push({
-          type: 'button',
-          text: { type: 'plain_text', text: '📁 移動', emoji: true },
-          action_id: 'open_move_folder_modal',
-          value: JSON.stringify({ taskId: t.id, folder: t.folder || '未分類' }),
-        });
-      }
-      actionElements.push({
-        type: 'button',
-        text: { type: 'plain_text', text: '✅ Done', emoji: true },
-        style: 'primary',
-        action_id: 'complete_task',
-        value: JSON.stringify({ taskId: t.id, tab: selectedTab, folder: safeSelectedFolder }),
-      });
+    const messageLinkButton = {
+      type: 'button',
+      text: { type: 'plain_text', text: '🔗 メッセージを表示', emoji: true },
+      url: link,
+      action_id: `open_message_link_${t.id}`,
+    };
+
+    if (isInfoTab) {
       cardBlocks.push({
         type: 'actions',
-        elements: actionElements,
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '📁 フォルダを移動', emoji: true },
+            action_id: 'open_move_folder_modal',
+            value: JSON.stringify({ taskId: t.id, folder: folderName }),
+          },
+          messageLinkButton,
+        ],
       });
     }
 
@@ -362,17 +379,11 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         elements: [
           {
             type: 'button',
-            text: { type: 'plain_text', text: '🔄 戻す', emoji: true },
+            text: { type: 'plain_text', text: '🔄 タブへ戻す', emoji: true },
             action_id: 'restore_item',
             value: JSON.stringify({ taskId: t.id }),
           },
-          {
-            type: 'button',
-            text: { type: 'plain_text', text: '🗑️ 削除', emoji: true },
-            style: 'primary',
-            action_id: 'delete_item',
-            value: JSON.stringify({ taskId: t.id }),
-          },
+          messageLinkButton,
         ],
       });
     }
