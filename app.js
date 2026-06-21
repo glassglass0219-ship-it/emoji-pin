@@ -10,6 +10,7 @@ const REQUIRED_BOT_SCOPES = [
   'chat:write',
   'reactions:read',
   'users:read',
+  'emoji:read',
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
@@ -68,7 +69,7 @@ const receiver = new ExpressReceiver({
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET || 'emoji-pin-default-state-secret',
-  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read'],
+  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read', 'emoji:read'],
   installationStore: {
     storeInstallation: async (installation) => {
       const teamId = installation.team?.id || installation.enterprise?.id;
@@ -594,6 +595,7 @@ async function joinAllPublicChannels(client, botToken) {
 
 const DEFAULT_CHECKING_EMOJI = 'eyes';
 const DEFAULT_INFO_EMOJI = 'bookmark';
+const MAX_EMOJI_SELECT_OPTIONS = 100;
 
 const businessEmojiOptions = [
   { icon: '✅', name: 'white_check_mark' },
@@ -616,11 +618,89 @@ function toSlackSelectOption(option) {
   };
 }
 
-function getInitialEmojiOption(savedValue, fallbackValue) {
-  const selected =
-    businessEmojiOptions.find((option) => option.name === savedValue) ||
-    businessEmojiOptions.find((option) => option.name === fallbackValue);
-  return toSlackSelectOption(selected);
+function toCustomEmojiSelectOption(name) {
+  return {
+    text: { type: 'plain_text', text: `:${name}: ${name}` },
+    value: name,
+  };
+}
+
+function buildEmojiSelectOptions(customEmojiNames = [], ensureNames = []) {
+  const standardOptions = businessEmojiOptions.map(toSlackSelectOption);
+  const standardNames = new Set(businessEmojiOptions.map((option) => option.name));
+  const options = [...standardOptions];
+  const used = new Set(standardNames);
+
+  const addOption = (name, option) => {
+    if (!name || used.has(name) || options.length >= MAX_EMOJI_SELECT_OPTIONS) return;
+    options.push(option);
+    used.add(name);
+  };
+
+  for (const name of [...new Set((ensureNames || []).filter(Boolean))].sort((a, b) => a.localeCompare(b))) {
+    if (standardNames.has(name)) continue;
+    addOption(name, toCustomEmojiSelectOption(name));
+  }
+
+  for (const name of [...new Set(customEmojiNames || [])]
+    .filter((emojiName) => emojiName && !standardNames.has(emojiName))
+    .sort((a, b) => a.localeCompare(b))) {
+    addOption(name, toCustomEmojiSelectOption(name));
+  }
+
+  return options;
+}
+
+function getStoredCustomEmojiNames(customEmojiNames, settings = {}) {
+  const standardNames = new Set(businessEmojiOptions.map((option) => option.name));
+  const included = new Set();
+
+  for (const name of [settings.taskEmoji, settings.infoEmoji]) {
+    if (name && !standardNames.has(name)) included.add(name);
+  }
+
+  for (const name of [...new Set(customEmojiNames || [])]
+    .filter((emojiName) => emojiName && !standardNames.has(emojiName))
+    .sort((a, b) => a.localeCompare(b))) {
+    if (included.size >= MAX_EMOJI_SELECT_OPTIONS - businessEmojiOptions.length) break;
+    included.add(name);
+  }
+
+  return [...included].sort((a, b) => a.localeCompare(b));
+}
+
+async function fetchWorkspaceCustomEmojiNames(client, teamId, botToken) {
+  const names = new Set();
+  let cursor;
+
+  try {
+    do {
+      const response = await client.emoji.list(withBotToken(
+        cursor ? { team_id: teamId, cursor } : { team_id: teamId },
+        botToken
+      ));
+      for (const name of Object.keys(response.emoji || {})) {
+        if (name) names.add(name);
+      }
+      cursor = response.response_metadata?.next_cursor;
+    } while (cursor);
+  } catch (error) {
+    console.warn(
+      `[${APP_NAME}] カスタム絵文字一覧の取得に失敗しました:`,
+      error?.data?.error || error.message
+    );
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+function getInitialEmojiOption(savedValue, fallbackValue, emojiOptions) {
+  return (
+    emojiOptions.find((option) => option.value === savedValue)
+    || emojiOptions.find((option) => option.value === fallbackValue)
+    || emojiOptions.find((option) => option.value === DEFAULT_CHECKING_EMOJI)
+    || emojiOptions[0]
+  );
 }
 
 function formatReminderTime({ hour, minute }) {
@@ -656,17 +736,19 @@ function parseSettingsModalMetadata(privateMetadata) {
       tab: parsed.tab || 'checking',
       folder: parsed.folder || 'すべて',
       reminderTimes: normalizeReminderTimesList(parsed.reminderTimes || []),
+      customEmojiNames: Array.isArray(parsed.customEmojiNames) ? parsed.customEmojiNames : [],
     };
   } catch {
-    return { tab: 'checking', folder: 'すべて', reminderTimes: [] };
+    return { tab: 'checking', folder: 'すべて', reminderTimes: [], customEmojiNames: [] };
   }
 }
 
-function buildSettingsModalMetadata(homeContext, reminderTimes) {
+function buildSettingsModalMetadata(homeContext, reminderTimes, customEmojiNames = []) {
   return JSON.stringify({
     tab: homeContext.tab || 'checking',
     folder: homeContext.folder || 'すべて',
     reminderTimes: normalizeReminderTimesList(reminderTimes),
+    customEmojiNames: customEmojiNames || [],
   });
 }
 
@@ -707,8 +789,9 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
   };
 }
 
-function buildSettingsModalBlocks(settings, reminderTimes) {
-  const emojiOptions = businessEmojiOptions.map(toSlackSelectOption);
+function buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames = []) {
+  const checkingEmojiOptions = buildEmojiSelectOptions(customEmojiNames, [settings.taskEmoji]);
+  const infoEmojiOptions = buildEmojiSelectOptions(customEmojiNames, [settings.infoEmoji]);
   const blocks = [
     {
       type: 'input',
@@ -718,8 +801,8 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
         type: 'static_select',
         action_id: 'checking_emoji_input',
         placeholder: { type: 'plain_text', text: '絵文字を選択' },
-        options: emojiOptions,
-        initial_option: getInitialEmojiOption(settings.taskEmoji, DEFAULT_CHECKING_EMOJI),
+        options: checkingEmojiOptions,
+        initial_option: getInitialEmojiOption(settings.taskEmoji, DEFAULT_CHECKING_EMOJI, checkingEmojiOptions),
       },
     },
     {
@@ -730,8 +813,8 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
         type: 'static_select',
         action_id: 'info_emoji_input',
         placeholder: { type: 'plain_text', text: '絵文字を選択' },
-        options: emojiOptions,
-        initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI),
+        options: infoEmojiOptions,
+        initial_option: getInitialEmojiOption(settings.infoEmoji, DEFAULT_INFO_EMOJI, infoEmojiOptions),
       },
     },
     { type: 'divider' },
@@ -817,15 +900,16 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
   return blocks;
 }
 
-function buildSettingsModalView(settings, reminderTimes, homeContext) {
+function buildSettingsModalView(settings, reminderTimes, homeContext, customEmojiNames = []) {
+  const storedCustomEmojiNames = getStoredCustomEmojiNames(customEmojiNames, settings);
   return {
     type: 'modal',
     callback_id: 'save_settings',
-    private_metadata: buildSettingsModalMetadata(homeContext, reminderTimes),
+    private_metadata: buildSettingsModalMetadata(homeContext, reminderTimes, storedCustomEmojiNames),
     title: { type: 'plain_text', text: '環境設定' },
     submit: { type: 'plain_text', text: '保存' },
     close: { type: 'plain_text', text: 'キャンセル' },
-    blocks: buildSettingsModalBlocks(settings, reminderTimes),
+    blocks: buildSettingsModalBlocks(settings, reminderTimes, customEmojiNames),
   };
 }
 
@@ -841,7 +925,7 @@ async function updateSettingsModal(client, body, reminderTimes) {
     view: buildSettingsModalView(settings, reminderTimes, {
       tab: metadata.tab,
       folder: metadata.folder,
-    }),
+    }, metadata.customEmojiNames),
   });
 }
 
@@ -984,9 +1068,13 @@ app.action('open_settings_modal', async ({ body, client, ack }) => {
   } catch {
     // legacy button value
   }
+  const botToken = await getInstallationBotToken(teamId);
+  const customEmojiNames = botToken
+    ? await fetchWorkspaceCustomEmojiNames(client, teamId, botToken)
+    : [];
   await client.views.open({
     trigger_id: body.trigger_id,
-    view: buildSettingsModalView(settings, reminderTimes, homeContext),
+    view: buildSettingsModalView(settings, reminderTimes, homeContext, customEmojiNames),
   });
 });
 
