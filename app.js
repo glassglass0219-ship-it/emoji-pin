@@ -10,6 +10,7 @@ const REQUIRED_BOT_SCOPES = [
   'chat:write',
   'reactions:read',
   'users:read',
+  'files:read',
 ];
 const AUTO_JOIN_PUBLIC_CHANNELS = process.env.AUTO_JOIN_PUBLIC_CHANNELS !== 'false';
 const HOME_ITEM_LIMIT = 14;
@@ -68,7 +69,7 @@ const receiver = new ExpressReceiver({
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET || 'emoji-pin-default-state-secret',
-  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read'],
+  scopes: ['channels:read', 'channels:history', 'chat:write', 'reactions:read', 'users:read', 'files:read'],
   installationStore: {
     storeInstallation: async (installation) => {
       const teamId = installation.team?.id || installation.enterprise?.id;
@@ -303,6 +304,11 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
 
     cardBlocks.push(cardSection);
 
+    const imageBlock = buildTaskImageBlock(t.imageUrl, link);
+    if (imageBlock) {
+      cardBlocks.push(imageBlock);
+    }
+
     const ageLabel = formatAddedAgeLabel(t.createdAt);
     const metaText = isCheckingTab
       ? `🕒 ${createdAt}  |  [${ageLabel}]  |  🔗 <${link}|メッセージを表示>`
@@ -526,37 +532,120 @@ async function ensureJoinedChannel(client, channelId, botToken) {
   }
 }
 
-async function getMessageText(client, channelId, messageTs) {
-  try {
+async function fetchSlackMessage(client, channelId, messageTs, threadTs = null) {
+  const loadHistory = async () => {
     const result = await client.conversations.history({
       channel: channelId,
       latest: messageTs,
       limit: 1,
       inclusive: true,
     });
-    return result.messages?.[0]?.text || '';
+    const message = result.messages?.[0];
+    return message?.ts === messageTs ? message : null;
+  };
+
+  const loadReplies = async (parentTs) => {
+    const result = await client.conversations.replies({
+      channel: channelId,
+      ts: parentTs,
+      latest: messageTs,
+      limit: 1,
+      inclusive: true,
+    });
+    return result.messages?.find((message) => message.ts === messageTs) || null;
+  };
+
+  let message = await loadHistory();
+  if (message) return message;
+
+  if (threadTs && threadTs !== messageTs) {
+    message = await loadReplies(threadTs);
+    if (message) return message;
+  }
+
+  message = await loadReplies(messageTs);
+  return message;
+}
+
+function extractMessageAttachmentData(message) {
+  let text = message?.text || '';
+  let imageUrl = null;
+  const files = message?.files || [];
+
+  const imageFile = files.find((file) => file.mimetype?.startsWith('image/'));
+  if (imageFile) {
+    imageUrl = imageFile.thumb_360
+      || imageFile.thumb_480
+      || imageFile.thumb_160
+      || imageFile.url_private
+      || imageFile.permalink_public
+      || null;
+  }
+
+  for (const file of files) {
+    if (file === imageFile) continue;
+    const fileName = file.name || file.title || 'ファイル';
+    const fileLink = file.permalink || file.permalink_public || file.url_private || '';
+    if (fileLink) {
+      text = text ? `${text}\n📎 <${fileLink}|${fileName}>` : `📎 <${fileLink}|${fileName}>`;
+    } else {
+      text = text ? `${text}\n📎 ${fileName}` : `📎 ${fileName}`;
+    }
+  }
+
+  return { text, imageUrl };
+}
+
+async function getMessageDetails(client, channelId, messageTs, threadTs = null) {
+  try {
+    const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
+    if (!message) return { text: '', imageUrl: null };
+    return extractMessageAttachmentData(message);
   } catch (error) {
     const code = getSlackErrorCode(error);
     if (code === 'not_in_channel') {
       const joined = await ensureJoinedChannel(client, channelId);
       if (joined) {
-        const result = await client.conversations.history({
-          channel: channelId,
-          latest: messageTs,
-          limit: 1,
-          inclusive: true,
-        });
-        return result.messages?.[0]?.text || '';
+        const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
+        if (!message) return { text: '', imageUrl: null };
+        return extractMessageAttachmentData(message);
       }
     }
 
     if (code === 'missing_scope') {
-      logPermissionHint('メッセージ本文取得', error, ['channels:history', 'groups:history']);
+      logPermissionHint('メッセージ詳細取得', error, ['channels:history', 'groups:history', 'files:read']);
     } else {
-      console.warn(`[${APP_NAME}] メッセージ本文を取得できませんでした: ${code}`);
+      console.warn(`[${APP_NAME}] メッセージ詳細を取得できませんでした: ${code}`);
     }
-    return '';
+    return { text: '', imageUrl: null };
   }
+}
+
+async function getMessageText(client, channelId, messageTs) {
+  const { text } = await getMessageDetails(client, channelId, messageTs);
+  return text;
+}
+
+function buildTaskImageBlock(imageUrl, messageLink) {
+  if (!imageUrl) return null;
+
+  const isSlackFileUrl = /files\.slack\.com|files-pri|slack-files|slack\.com\/files/i.test(imageUrl);
+  const block = {
+    type: 'image',
+    alt_text: '添付画像',
+    ...(isSlackFileUrl
+      ? { slack_file: { url: imageUrl } }
+      : { image_url: imageUrl }),
+  };
+
+  if (messageLink) {
+    block.title = {
+      type: 'plain_text',
+      text: 'タップしてメッセージで拡大表示',
+    };
+  }
+
+  return block;
 }
 
 async function verifyInstallReadiness(client, botToken) {
@@ -1420,7 +1509,7 @@ app.event('reaction_added', async ({ event, body, client }) => {
     else if (reaction === settings.infoEmoji) category = 'INFO';
     if (!category) return;
 
-    const text = await getMessageText(client, item.channel, item.ts);
+    const messageDetails = await getMessageDetails(client, item.channel, item.ts, item.thread_ts);
     const itemUser = event.item_user || user;
     const userIcon = await getUserIcon(client, itemUser);
     const task = await saveTask({
@@ -1430,9 +1519,10 @@ app.event('reaction_added', async ({ event, body, client }) => {
       user_icon: userIcon,
       messageTs: item.ts,
       channelId: item.channel,
-      text,
+      text: messageDetails.text,
       emoji: reaction,
       category,
+      imageUrl: messageDetails.imageUrl,
     });
     console.log('DB保存完了:', task);
   } catch (error) {

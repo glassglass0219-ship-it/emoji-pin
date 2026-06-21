@@ -47,6 +47,7 @@ async function initDb() {
       t.string('status').notNullable().defaultTo('pending'); // pending | completed
       t.timestamp('createdAt').defaultTo(knex.fn.now());
       t.timestamp('completedAt');
+      t.text('imageUrl');
     });
   }
 
@@ -68,6 +69,10 @@ async function initDb() {
 
   await ensureColumn('tasks', 'completedAt', (t) => {
     t.timestamp('completedAt');
+  });
+
+  await ensureColumn('tasks', 'imageUrl', (t) => {
+    t.text('imageUrl');
   });
 
   const hasFolderColumn = await knex.schema.hasColumn('tasks', 'folder');
@@ -290,16 +295,46 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
   return row;
 }
 
-async function saveTask({ teamId = DEFAULT_TEAM_ID, userId, itemUser, userIcon, user_icon, messageTs, channelId, text, emoji, category }) {
+async function saveTask({
+  teamId = DEFAULT_TEAM_ID,
+  userId,
+  itemUser,
+  userIcon,
+  user_icon,
+  messageTs,
+  channelId,
+  text,
+  emoji,
+  category,
+  imageUrl,
+}) {
   const iconUrl = user_icon || userIcon || null;
   const existing = await knex('tasks').where({ teamId, userId, messageTs, channelId, category }).first();
   if (existing) {
-    await knex('tasks').where({ id: existing.id }).update({ text, emoji, itemUser, user_icon: iconUrl, status: 'pending' });
+    await knex('tasks').where({ id: existing.id }).update({
+      text,
+      emoji,
+      itemUser,
+      user_icon: iconUrl,
+      status: 'pending',
+      imageUrl: imageUrl ?? existing.imageUrl ?? null,
+    });
     return knex('tasks').where({ id: existing.id }).first();
   }
 
   const [inserted] = await knex('tasks')
-    .insert({ teamId, userId, itemUser, user_icon: iconUrl, messageTs, channelId, text, emoji, category })
+    .insert({
+      teamId,
+      userId,
+      itemUser,
+      user_icon: iconUrl,
+      messageTs,
+      channelId,
+      text,
+      emoji,
+      category,
+      imageUrl: imageUrl ?? null,
+    })
     .returning('id');
   const id = typeof inserted === 'object' ? inserted.id : inserted;
   return knex('tasks').where({ id }).first();
