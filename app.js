@@ -1191,7 +1191,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '\n投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\nスタンプは用途で使い分けて、別リストで管理できます。\n確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！\n',
+          text: '\n投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\nスタンプは用途で使い分けて、別リストで管理できます。\n[👀確認中]にはリマインド機能、[📖資料]にはフォルダ機能も搭載！\n',
         }],
       },
       { type: 'divider' },
@@ -1227,7 +1227,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '\nEmoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルームに `/invite @Emoji Pin` と投稿し、招待してください！\n',
+          text: '\nEmoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルームに `/invite @Emoji Pin` と投稿し、botを招待してください！\n',
         }],
       },
     ],
