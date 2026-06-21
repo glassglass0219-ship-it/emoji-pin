@@ -16,6 +16,7 @@ const knex = require('knex')({
 
 const DEFAULT_CHECKING_EMOJI = 'eyes';
 const DEFAULT_INFO_EMOJI = 'bookmark';
+const DEFAULT_CUSTOM_EMOJI_LIST = 'eyes,bookmark,white_check_mark,memo';
 const TASK_EMOJI_DEFAULT_MIGRATION = 'default_task_emoji_eyes';
 const REMINDER_MINUTE_PK_MIGRATION = 'reminder_settings_minute_primary_key';
 const DEFAULT_TEAM_ID = 'default';
@@ -102,6 +103,14 @@ async function initDb() {
   await ensureColumn('settings', 'praiseEnabled', (t) => {
     t.boolean('praiseEnabled').notNullable().defaultTo(false);
   });
+
+  await ensureColumn('settings', 'customEmojiList', (t) => {
+    t.text('customEmojiList').defaultTo(DEFAULT_CUSTOM_EMOJI_LIST);
+  });
+
+  if (await knex.schema.hasColumn('settings', 'customEmojiList')) {
+    await knex('settings').whereNull('customEmojiList').update({ customEmojiList: DEFAULT_CUSTOM_EMOJI_LIST });
+  }
 
   const hasReminderSettings = await knex.schema.hasTable('reminder_settings');
   if (!hasReminderSettings) {
@@ -259,8 +268,12 @@ async function getSettings(userId, teamId = DEFAULT_TEAM_ID) {
       checkingSort: 'desc',
       docsSort: 'desc',
       praiseEnabled: false,
+      customEmojiList: DEFAULT_CUSTOM_EMOJI_LIST,
     });
     row = await knex('settings').where({ userId, teamId }).first();
+  }
+  if (!row.customEmojiList) {
+    row.customEmojiList = DEFAULT_CUSTOM_EMOJI_LIST;
   }
   return row;
 }

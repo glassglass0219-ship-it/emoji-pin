@@ -594,12 +594,56 @@ async function joinAllPublicChannels(client, botToken) {
 
 const DEFAULT_CHECKING_EMOJI = 'eyes';
 const DEFAULT_INFO_EMOJI = 'bookmark';
+const DEFAULT_CUSTOM_EMOJI_LIST = 'eyes,bookmark,white_check_mark,memo';
+const MAX_EMOJI_SELECT_OPTIONS = 100;
 
 function normalizeEmojiName(value, fallback) {
   const normalized = String(value || '')
     .trim()
     .replace(/:/g, '');
   return normalized || fallback;
+}
+
+function parseCustomEmojiList(text) {
+  const names = String(text || '')
+    .split(',')
+    .map((part) => normalizeEmojiName(part, ''))
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+
+function normalizeCustomEmojiList(text) {
+  const normalized = parseCustomEmojiList(text).join(',');
+  return normalized || DEFAULT_CUSTOM_EMOJI_LIST;
+}
+
+function toEmojiSelectOption(name) {
+  return {
+    text: { type: 'plain_text', text: `:${name}: ${name}` },
+    value: name,
+  };
+}
+
+function buildEmojiSelectOptionsFromList(customEmojiListText, ensureNames = []) {
+  const names = parseCustomEmojiList(customEmojiListText);
+  for (const name of ensureNames) {
+    const normalized = normalizeEmojiName(name, '');
+    if (normalized && !names.includes(normalized)) {
+      names.unshift(normalized);
+    }
+  }
+  if (names.length === 0) {
+    names.push(...parseCustomEmojiList(DEFAULT_CUSTOM_EMOJI_LIST));
+  }
+  return names.slice(0, MAX_EMOJI_SELECT_OPTIONS).map(toEmojiSelectOption);
+}
+
+function getInitialEmojiSelectOption(savedValue, fallbackValue, emojiOptions) {
+  return (
+    emojiOptions.find((option) => option.value === savedValue)
+    || emojiOptions.find((option) => option.value === fallbackValue)
+    || emojiOptions[0]
+  );
 }
 
 function formatReminderTime({ hour, minute }) {
@@ -675,15 +719,19 @@ function buildPraiseSectionBlock(settings) {
 
 function getSettingsFromViewOrDefaults(view, dbSettings) {
   const vals = view?.state?.values || {};
+  const customEmojiList = normalizeCustomEmojiList(
+    vals.custom_emoji_list_block?.custom_emoji_list_input?.value
+      ?? dbSettings.customEmojiList
+      ?? DEFAULT_CUSTOM_EMOJI_LIST
+  );
   return {
-    taskEmoji: normalizeEmojiName(
-      vals.checking_emoji_block?.checking_emoji_input?.value,
-      dbSettings.taskEmoji || DEFAULT_CHECKING_EMOJI
-    ),
-    infoEmoji: normalizeEmojiName(
-      vals.info_emoji_block?.info_emoji_input?.value,
-      dbSettings.infoEmoji || DEFAULT_INFO_EMOJI
-    ),
+    customEmojiList,
+    taskEmoji: vals.checking_emoji_block?.checking_emoji_input?.selected_option?.value
+      || dbSettings.taskEmoji
+      || DEFAULT_CHECKING_EMOJI,
+    infoEmoji: vals.info_emoji_block?.info_emoji_input?.selected_option?.value
+      || dbSettings.infoEmoji
+      || DEFAULT_INFO_EMOJI,
     checkingSort: vals.checking_sort_block?.checking_sort_input?.selected_option?.value || dbSettings.checkingSort,
     docsSort: vals.docs_sort_block?.docs_sort_input?.selected_option?.value || dbSettings.docsSort,
     praiseEnabled: vals.praise_section_block?.praise_checkbox_action?.selected_options
@@ -693,16 +741,35 @@ function getSettingsFromViewOrDefaults(view, dbSettings) {
 }
 
 function buildSettingsModalBlocks(settings, reminderTimes) {
+  const customEmojiList = settings.customEmojiList || DEFAULT_CUSTOM_EMOJI_LIST;
+  const checkingEmojiOptions = buildEmojiSelectOptionsFromList(customEmojiList, [settings.taskEmoji]);
+  const infoEmojiOptions = buildEmojiSelectOptionsFromList(customEmojiList, [settings.infoEmoji]);
   const blocks = [
+    {
+      type: 'input',
+      block_id: 'custom_emoji_list_block',
+      label: { type: 'plain_text', text: 'プルダウンに表示する絵文字の編集' },
+      element: {
+        type: 'plain_text_input',
+        action_id: 'custom_emoji_list_input',
+        placeholder: { type: 'plain_text', text: 'eyes, bookmark, fire のようにカンマ区切りで入力' },
+        initial_value: customEmojiList,
+      },
+    },
     {
       type: 'input',
       block_id: 'checking_emoji_block',
       label: { type: 'plain_text', text: '確認中用スタンプ' },
       element: {
-        type: 'plain_text_input',
+        type: 'static_select',
         action_id: 'checking_emoji_input',
-        placeholder: { type: 'plain_text', text: 'eyes や bookmark など、絵文字名をコロンなしで入力' },
-        initial_value: settings.taskEmoji || DEFAULT_CHECKING_EMOJI,
+        placeholder: { type: 'plain_text', text: '絵文字を選択' },
+        options: checkingEmojiOptions,
+        initial_option: getInitialEmojiSelectOption(
+          settings.taskEmoji,
+          DEFAULT_CHECKING_EMOJI,
+          checkingEmojiOptions
+        ),
       },
     },
     {
@@ -710,15 +777,16 @@ function buildSettingsModalBlocks(settings, reminderTimes) {
       block_id: 'info_emoji_block',
       label: { type: 'plain_text', text: '資料用スタンプ' },
       element: {
-        type: 'plain_text_input',
+        type: 'static_select',
         action_id: 'info_emoji_input',
-        placeholder: { type: 'plain_text', text: 'eyes や bookmark など、絵文字名をコロンなしで入力' },
-        initial_value: settings.infoEmoji || DEFAULT_INFO_EMOJI,
+        placeholder: { type: 'plain_text', text: '絵文字を選択' },
+        options: infoEmojiOptions,
+        initial_option: getInitialEmojiSelectOption(
+          settings.infoEmoji,
+          DEFAULT_INFO_EMOJI,
+          infoEmojiOptions
+        ),
       },
-    },
-    {
-      type: 'context',
-      elements: [{ type: 'mrkdwn', text: '※ワークスペース独自の絵文字名も入力可能です' }],
     },
     { type: 'divider' },
     {
@@ -1000,12 +1068,13 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
   const vals = view.state.values;
   const userId = body.user.id;
   const teamId = getTeamId(body);
+  const customEmojiList = normalizeCustomEmojiList(vals.custom_emoji_list_block.custom_emoji_list_input.value);
   const checkingEmoji = normalizeEmojiName(
-    vals.checking_emoji_block.checking_emoji_input.value,
+    vals.checking_emoji_block.checking_emoji_input.selected_option?.value,
     DEFAULT_CHECKING_EMOJI
   );
   const infoEmoji = normalizeEmojiName(
-    vals.info_emoji_block.info_emoji_input.value,
+    vals.info_emoji_block.info_emoji_input.selected_option?.value,
     DEFAULT_INFO_EMOJI
   );
   const checkingSort = normalizeSort(vals.checking_sort_block.checking_sort_input.selected_option?.value);
@@ -1030,13 +1099,14 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
       checkingSort,
       docsSort,
       praiseEnabled,
+      customEmojiList,
     });
   } else {
     const legacySettings = await knex('settings').where({ teamId: 'default', userId }).first();
     if (legacySettings) {
       await knex('settings')
         .where({ teamId: 'default', userId })
-        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort, praiseEnabled });
+        .update({ teamId, taskEmoji: checkingEmoji, infoEmoji, checkingSort, docsSort, praiseEnabled, customEmojiList });
     } else {
       await knex('settings').insert({
         teamId,
@@ -1046,6 +1116,7 @@ app.view('save_settings', async ({ view, body, client, ack }) => {
         checkingSort,
         docsSort,
         praiseEnabled,
+        customEmojiList,
       });
     }
   }
