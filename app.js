@@ -1039,10 +1039,15 @@ function buildUsageModalView() {
     close: { type: 'plain_text', text: '閉じる' },
     blocks: [
       {
+        type: 'header',
+        text: { type: 'plain_text', text: '✨ Emoji Pin の使い方', emoji: true },
+      },
+      { type: 'divider' },
+      {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*📌 忘れないうちに保存！*\n投稿にスタンプを付けるだけで、あなた専用のリストが完成します。',
+          text: '*📌 忘れないうちに保存！*\n\n　 投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\n　 スタンプは用途で使い分けて、別リストで管理できます。\n\n　 確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！',
         },
       },
       { type: 'divider' },
@@ -1050,7 +1055,7 @@ function buildUsageModalView() {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*✅ 終わったらスッキリ！*\n[✅ Done] を押して、タスクを完了に送りましょう。',
+          text: '*✅ 終わったらスッキリ！*\n\n　 完了したタスクは *[✅ Done]* を押してDONEタブに送りましょう。\n　 DONEタブから元タブへの復元も可能です。',
         },
       },
       { type: 'divider' },
@@ -1058,7 +1063,7 @@ function buildUsageModalView() {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*⚙️ あなた専用に調整*\nお好みのスタンプやリマインドは [⚙️ 設定] から変更可能。',
+          text: '*⚙️ あなた専用に調整*\n\n　 お好みのスタンプやリマインドは *[⚙️ 設定]* から変更可能。\n　 リマインドは終業1時間前など余裕をもって設定するのがオススメ。\n　 確認タスクが毎日0件になるのを目指しましょう！',
         },
       },
       { type: 'divider' },
@@ -1066,7 +1071,7 @@ function buildUsageModalView() {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*💡 重要*\nボットがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルーム（チャンネル）に `/invite @Emoji Pin` と投稿し、ボットを招待してください。',
+          text: '*💡 重要*\n\nEmoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルームに `/invite @Emoji Pin` と投稿し、botを招待してください！',
         },
       },
     ],
