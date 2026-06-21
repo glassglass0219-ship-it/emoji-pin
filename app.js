@@ -1176,7 +1176,7 @@ function buildUsageModalView() {
   return {
     type: 'modal',
     title: { type: 'plain_text', text: '使い方ガイド' },
-    close: { type: 'plain_text', text: '閉じる' },
+    close: { type: 'plain_text', text: '使ってみる' },
     blocks: [
       {
         type: 'header',
@@ -1191,7 +1191,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '\n投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\nスタンプは用途で使い分けて、別リストで管理できます。\n[👀確認中]にはリマインド機能、[📖資料]にはフォルダ機能も搭載！\n',
+          text: '\n投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\n[👀確認中]にはリマインド機能、[📖資料]にはフォルダ機能も搭載！\n',
         }],
       },
       { type: 'divider' },
@@ -1203,7 +1203,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '\n完了したタスクは [✅ Done] を押してDONEタブに送りましょう。\nDONEタブから元タブへの復元も可能です。\n',
+          text: '\n完了したタスクは [✅ Done] を押してDONEタブに送りましょう。\n',
         }],
       },
       { type: 'divider' },
