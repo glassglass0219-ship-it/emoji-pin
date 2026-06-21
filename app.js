@@ -1080,7 +1080,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '投稿にスタンプを付けるだけで、あなた専用のリストが完成します。スタンプは用途で使い分けて、別リストで管理できます。確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！',
+          text: '投稿にスタンプを付けるだけで、あなた専用のリストが完成します。\nスタンプは用途で使い分けて、別リストで管理できます。\n確認中タブにはリマインド機能、資料タブにはフォルダ機能も搭載！',
         }],
       },
       { type: 'divider' },
@@ -1092,7 +1092,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: '完了したタスクは [✅ Done] を押してDONEタブに送りましょう。DONEタブから元タブへの復元も可能です。',
+          text: '完了したタスクは [✅ Done] を押してDONEタブに送りましょう。\nDONEタブから元タブへの復元も可能です。',
         }],
       },
       { type: 'divider' },
@@ -1104,7 +1104,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: 'お好みのスタンプやリマインドは [⚙️ 設定] から変更可能。リマインドは終業1時間前など余裕をもって設定するのがオススメです。',
+          text: 'お好みのスタンプやリマインドは [⚙️ 設定] から変更可能。\nリマインドは終業1時間前など余裕をもって設定するのがオススメです。',
         }],
       },
       { type: 'divider' },
@@ -1116,7 +1116,7 @@ function buildUsageModalView() {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: 'Emoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。リスト化してほしいルームに `/invite @Emoji Pin` と投稿し、招待してください！',
+          text: 'Emoji Pinはbotがあなたのリアクションに反応し、リスト化する仕組みです。\nリスト化してほしいルームに `/invite @Emoji Pin` と投稿し、招待してください！',
         }],
       },
     ],
