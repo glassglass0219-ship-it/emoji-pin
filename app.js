@@ -288,18 +288,6 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     const ageLabel = formatAddedAgeLabel(t.createdAt);
     const cardBlocks = [{ type: 'divider' }];
 
-    const cardSection = {
-      type: 'section',
-      text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
-    };
-
-    cardBlocks.push(cardSection);
-
-    const imageBlock = buildTaskImageBlock(t.imageUrl, link);
-    if (imageBlock) {
-      cardBlocks.push(imageBlock);
-    }
-
     let metaText;
     if (isCheckingTab) {
       metaText = `🕒 ${createdAt}  |  [${ageLabel}]  |  <${link}|🔗 メッセージを表示>`;
@@ -327,6 +315,16 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         },
       ],
     });
+
+    cardBlocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
+    });
+
+    const imageBlock = buildTaskImageBlock(t.imageUrl, link);
+    if (imageBlock) {
+      cardBlocks.push(imageBlock);
+    }
 
     if (isCheckingTab) {
       cardBlocks.push({
