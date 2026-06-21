@@ -290,7 +290,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     const iconUrl = t.user_icon || t.userIcon || defaultUserIcon;
     const cardBlocks = [{ type: 'divider' }];
 
-    let bodyText = `*<@${displayUser}>*\n`;
+    let bodyText = '';
     if (isInfoTab) {
       bodyText += `📁 ${t.folder || '未分類'}\n`;
     }
@@ -304,9 +304,9 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     cardBlocks.push(cardSection);
 
     const ageLabel = formatAddedAgeLabel(t.createdAt);
-    const contextText = isCheckingTab
-      ? `🕒 ${createdAt}  |  [${ageLabel}]  |  <${link}|メッセージを表示>`
-      : `🕒 ${createdAt}  |  <${link}|メッセージを表示>`;
+    const metaText = isCheckingTab
+      ? `🕒 ${createdAt}  |  [${ageLabel}]  |  🔗 <${link}|メッセージを表示>`
+      : `🕒 ${createdAt}  |  🔗 <${link}|メッセージを表示>`;
 
     cardBlocks.push({
       type: 'context',
@@ -318,7 +318,11 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         },
         {
           type: 'mrkdwn',
-          text: contextText,
+          text: `*<@${displayUser}>*`,
+        },
+        {
+          type: 'mrkdwn',
+          text: metaText,
         },
       ],
     });
