@@ -195,18 +195,21 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
           text: { type: 'plain_text', text: `👀 確認中 (${checkingItems.length})`, emoji: true },
           action_id: 'switch_tab_checking',
           value: 'checking',
+          ...(isCheckingTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: `📖 資料 (${infoItems.length})`, emoji: true },
           action_id: 'switch_tab_info',
           value: 'info',
+          ...(isInfoTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: '✅ DONE', emoji: true },
           action_id: 'switch_tab_done',
           value: 'done',
+          ...(isDoneTab ? { style: 'primary' } : {}),
         },
         {
           type: 'button',
@@ -237,6 +240,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         text: { type: 'plain_text', text: folder, emoji: true },
         action_id: `switch_folder_${index}`,
         value: folder,
+        ...(folder === safeSelectedFolder ? { style: 'primary' } : {}),
       })),
     ];
 
