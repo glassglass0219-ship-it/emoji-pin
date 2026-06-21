@@ -162,6 +162,12 @@ function getTeamId(payload = {}) {
 
 // ─── ユーティリティ ──────────────────────────────────────────────────────────
 
+function formatAddedAgeLabel(createdAt) {
+  const diffDays = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 1) return '今日追加';
+  return `${diffDays}日前に追加`;
+}
+
 function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分類'], selectedFolder = 'すべて') {
   const checkingItems = homeTasks.filter((t) => t.category === 'TASK' && t.status === 'pending');
   const infoItems = homeTasks.filter((t) => t.category === 'INFO' && t.status === 'pending');
@@ -297,6 +303,11 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
 
     cardBlocks.push(cardSection);
 
+    const ageLabel = formatAddedAgeLabel(t.createdAt);
+    const contextText = isCheckingTab
+      ? `🕒 ${createdAt}  |  [${ageLabel}]  |  <${link}|メッセージを表示>`
+      : `🕒 ${createdAt}  |  <${link}|メッセージを表示>`;
+
     cardBlocks.push({
       type: 'context',
       elements: [
@@ -307,7 +318,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
         },
         {
           type: 'mrkdwn',
-          text: `🕒 ${createdAt}  |  <${link}|メッセージを表示>`,
+          text: contextText,
         },
       ],
     });
