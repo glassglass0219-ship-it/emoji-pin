@@ -325,11 +325,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
     });
 
-    const imageUrls = Array.isArray(t.imageUrls) && t.imageUrls.length > 0
-      ? t.imageUrls
-      : t.imageUrl
-        ? [t.imageUrl]
-        : [];
+    const imageUrls = parseTaskImageUrls(t.imageUrls, t.imageUrl);
     cardBlocks.push(...buildTaskImageContextBlocks(imageUrls, link));
 
     if (isCheckingTab) {
@@ -605,13 +601,13 @@ function extractMessageAttachmentData(message) {
     }
   }
 
-  return { text, imageUrls: imageUrls.length > 0 ? imageUrls : null };
+  return { text, imageUrls };
 }
 
 async function getMessageDetails(client, channelId, messageTs, threadTs = null) {
   try {
     const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
-    if (!message) return { text: '', imageUrls: null };
+    if (!message) return { text: '', imageUrls: [] };
     return extractMessageAttachmentData(message);
   } catch (error) {
     const code = getSlackErrorCode(error);
@@ -619,7 +615,7 @@ async function getMessageDetails(client, channelId, messageTs, threadTs = null) 
       const joined = await ensureJoinedChannel(client, channelId);
       if (joined) {
         const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
-        if (!message) return { text: '', imageUrls: null };
+        if (!message) return { text: '', imageUrls: [] };
         return extractMessageAttachmentData(message);
       }
     }
@@ -629,13 +625,31 @@ async function getMessageDetails(client, channelId, messageTs, threadTs = null) 
     } else {
       console.warn(`[${APP_NAME}] メッセージ詳細を取得できませんでした: ${code}`);
     }
-    return { text: '', imageUrls: null };
+    return { text: '', imageUrls: [] };
   }
 }
 
 async function getMessageText(client, channelId, messageTs) {
   const { text } = await getMessageDetails(client, channelId, messageTs);
   return text;
+}
+
+function parseTaskImageUrls(imageUrls, legacyImageUrl = null) {
+  let urls = [];
+  if (Array.isArray(imageUrls)) {
+    urls = imageUrls;
+  } else if (typeof imageUrls === 'string') {
+    try {
+      const parsed = JSON.parse(imageUrls);
+      urls = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      urls = imageUrls.trim() ? [imageUrls] : [];
+    }
+  }
+  if (urls.length === 0 && legacyImageUrl) {
+    urls = [legacyImageUrl];
+  }
+  return urls.map((url) => String(url || '').trim()).filter(Boolean);
 }
 
 function isSlackFileUrl(imageUrl) {
@@ -1558,7 +1572,7 @@ app.event('reaction_added', async ({ event, body, client }) => {
       text: messageDetails.text,
       emoji: reaction,
       category,
-      imageUrls: messageDetails.imageUrls,
+      imageUrls: Array.isArray(messageDetails.imageUrls) ? messageDetails.imageUrls : [],
     });
     console.log('DB保存完了:', task);
   } catch (error) {

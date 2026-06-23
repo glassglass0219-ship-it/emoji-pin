@@ -348,11 +348,15 @@ async function saveTask({
 }) {
   const iconUrl = user_icon || userIcon || null;
   const existing = await knex('tasks').where({ teamId, userId, messageTs, channelId, category }).first();
-  const resolvedImageUrls = imageUrls !== undefined
-    ? normalizeImageUrls(imageUrls)
-    : imageUrl !== undefined
-      ? normalizeImageUrls(imageUrl)
-      : normalizeImageUrls(existing?.imageUrls ?? existing?.imageUrl ?? null);
+  let resolvedImageUrls;
+  if (imageUrls !== undefined) {
+    resolvedImageUrls = normalizeImageUrls(imageUrls) ?? [];
+  } else if (imageUrl !== undefined) {
+    resolvedImageUrls = normalizeImageUrls(imageUrl) ?? [];
+  } else {
+    resolvedImageUrls = normalizeImageUrls(existing?.imageUrls ?? existing?.imageUrl ?? null) ?? [];
+  }
+  const serializedImageUrls = JSON.stringify(resolvedImageUrls || []);
 
   if (existing) {
     await knex('tasks').where({ id: existing.id }).update({
@@ -361,7 +365,7 @@ async function saveTask({
       itemUser,
       user_icon: iconUrl,
       status: 'pending',
-      imageUrls: resolvedImageUrls,
+      imageUrls: knex.raw('?::jsonb', [serializedImageUrls]),
     });
     return knex('tasks').where({ id: existing.id }).first();
   }
@@ -377,7 +381,7 @@ async function saveTask({
       text,
       emoji,
       category,
-      imageUrls: resolvedImageUrls,
+      imageUrls: knex.raw('?::jsonb', [serializedImageUrls]),
     })
     .returning('id');
   const id = typeof inserted === 'object' ? inserted.id : inserted;
