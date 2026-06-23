@@ -19,7 +19,30 @@ const DEFAULT_INFO_EMOJI = 'bookmark';
 const DEFAULT_CUSTOM_EMOJI_LIST = 'eyes,bookmark,white_check_mark,memo';
 const TASK_EMOJI_DEFAULT_MIGRATION = 'default_task_emoji_eyes';
 const REMINDER_MINUTE_PK_MIGRATION = 'reminder_settings_minute_primary_key';
+const TASK_IMAGE_URLS_MIGRATION = 'tasks_image_urls_jsonb';
 const DEFAULT_TEAM_ID = 'default';
+
+function normalizeImageUrls(value) {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    const urls = value.map((url) => String(url || '').trim()).filter(Boolean);
+    return urls.length > 0 ? urls : null;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return normalizeImageUrls(parsed);
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    return [trimmed];
+  }
+  return null;
+}
 
 async function ensureColumn(tableName, columnName, addColumn) {
   const hasColumn = await knex.schema.hasColumn(tableName, columnName);
@@ -47,7 +70,7 @@ async function initDb() {
       t.string('status').notNullable().defaultTo('pending'); // pending | completed
       t.timestamp('createdAt').defaultTo(knex.fn.now());
       t.timestamp('completedAt');
-      t.text('imageUrl');
+      t.jsonb('imageUrls');
     });
   }
 
@@ -73,6 +96,10 @@ async function initDb() {
 
   await ensureColumn('tasks', 'imageUrl', (t) => {
     t.text('imageUrl');
+  });
+
+  await ensureColumn('tasks', 'imageUrls', (t) => {
+    t.jsonb('imageUrls');
   });
 
   const hasFolderColumn = await knex.schema.hasColumn('tasks', 'folder');
@@ -177,6 +204,16 @@ async function initDb() {
     await knex.raw('ALTER TABLE reminder_settings DROP CONSTRAINT IF EXISTS reminder_settings_pkey');
     await knex.raw('ALTER TABLE reminder_settings ADD PRIMARY KEY (team_id, user_id, hour, minute)');
     await knex('migrations').insert({ name: REMINDER_MINUTE_PK_MIGRATION });
+  }
+
+  const imageUrlsMigration = await knex('migrations').where({ name: TASK_IMAGE_URLS_MIGRATION }).first();
+  if (!imageUrlsMigration && (await knex.schema.hasColumn('tasks', 'imageUrl'))) {
+    await knex.raw(`
+      UPDATE tasks
+      SET "imageUrls" = jsonb_build_array("imageUrl")
+      WHERE "imageUrl" IS NOT NULL AND "imageUrls" IS NULL
+    `);
+    await knex('migrations').insert({ name: TASK_IMAGE_URLS_MIGRATION });
   }
 
   const hasInstallations = await knex.schema.hasTable('installations');
@@ -307,9 +344,16 @@ async function saveTask({
   emoji,
   category,
   imageUrl,
+  imageUrls,
 }) {
   const iconUrl = user_icon || userIcon || null;
   const existing = await knex('tasks').where({ teamId, userId, messageTs, channelId, category }).first();
+  const resolvedImageUrls = imageUrls !== undefined
+    ? normalizeImageUrls(imageUrls)
+    : imageUrl !== undefined
+      ? normalizeImageUrls(imageUrl)
+      : normalizeImageUrls(existing?.imageUrls ?? existing?.imageUrl ?? null);
+
   if (existing) {
     await knex('tasks').where({ id: existing.id }).update({
       text,
@@ -317,7 +361,7 @@ async function saveTask({
       itemUser,
       user_icon: iconUrl,
       status: 'pending',
-      imageUrl: imageUrl ?? existing.imageUrl ?? null,
+      imageUrls: resolvedImageUrls,
     });
     return knex('tasks').where({ id: existing.id }).first();
   }
@@ -333,7 +377,7 @@ async function saveTask({
       text,
       emoji,
       category,
-      imageUrl: imageUrl ?? null,
+      imageUrls: resolvedImageUrls,
     })
     .returning('id');
   const id = typeof inserted === 'object' ? inserted.id : inserted;

@@ -325,10 +325,12 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
       text: { type: 'mrkdwn', text: t.text || '(テキストなし)' },
     });
 
-    const imageBlock = buildTaskImageBlock(t.imageUrl, link);
-    if (imageBlock) {
-      cardBlocks.push(imageBlock);
-    }
+    const imageUrls = Array.isArray(t.imageUrls) && t.imageUrls.length > 0
+      ? t.imageUrls
+      : t.imageUrl
+        ? [t.imageUrl]
+        : [];
+    cardBlocks.push(...buildTaskImageContextBlocks(imageUrls, link));
 
     if (isCheckingTab) {
       cardBlocks.push({
@@ -574,23 +576,26 @@ async function fetchSlackMessage(client, channelId, messageTs, threadTs = null) 
   return message;
 }
 
+function getImageThumbnailUrl(imageFile) {
+  return imageFile.thumb_160
+    || imageFile.thumb_360
+    || imageFile.thumb_480
+    || imageFile.url_private
+    || imageFile.permalink_public
+    || null;
+}
+
 function extractMessageAttachmentData(message) {
   let text = message?.text || '';
-  let imageUrl = null;
   const files = message?.files || [];
 
-  const imageFile = files.find((file) => file.mimetype?.startsWith('image/'));
-  if (imageFile) {
-    imageUrl = imageFile.thumb_360
-      || imageFile.thumb_480
-      || imageFile.thumb_160
-      || imageFile.url_private
-      || imageFile.permalink_public
-      || null;
-  }
+  const imageUrls = files
+    .filter((file) => file.mimetype?.startsWith('image/'))
+    .map(getImageThumbnailUrl)
+    .filter(Boolean);
 
   for (const file of files) {
-    if (file === imageFile) continue;
+    if (file.mimetype?.startsWith('image/')) continue;
     const fileName = file.name || file.title || 'ファイル';
     const fileLink = file.permalink || file.permalink_public || file.url_private || '';
     if (fileLink) {
@@ -600,13 +605,13 @@ function extractMessageAttachmentData(message) {
     }
   }
 
-  return { text, imageUrl };
+  return { text, imageUrls: imageUrls.length > 0 ? imageUrls : null };
 }
 
 async function getMessageDetails(client, channelId, messageTs, threadTs = null) {
   try {
     const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
-    if (!message) return { text: '', imageUrl: null };
+    if (!message) return { text: '', imageUrls: null };
     return extractMessageAttachmentData(message);
   } catch (error) {
     const code = getSlackErrorCode(error);
@@ -614,7 +619,7 @@ async function getMessageDetails(client, channelId, messageTs, threadTs = null) 
       const joined = await ensureJoinedChannel(client, channelId);
       if (joined) {
         const message = await fetchSlackMessage(client, channelId, messageTs, threadTs);
-        if (!message) return { text: '', imageUrl: null };
+        if (!message) return { text: '', imageUrls: null };
         return extractMessageAttachmentData(message);
       }
     }
@@ -624,7 +629,7 @@ async function getMessageDetails(client, channelId, messageTs, threadTs = null) 
     } else {
       console.warn(`[${APP_NAME}] メッセージ詳細を取得できませんでした: ${code}`);
     }
-    return { text: '', imageUrl: null };
+    return { text: '', imageUrls: null };
   }
 }
 
@@ -633,26 +638,50 @@ async function getMessageText(client, channelId, messageTs) {
   return text;
 }
 
-function buildTaskImageBlock(imageUrl, messageLink) {
+function isSlackFileUrl(imageUrl) {
+  return /files\.slack\.com|files-pri|slack-files|slack\.com\/files/i.test(imageUrl);
+}
+
+function buildTaskImageElement(imageUrl, index) {
   if (!imageUrl) return null;
 
-  const isSlackFileUrl = /files\.slack\.com|files-pri|slack-files|slack\.com\/files/i.test(imageUrl);
-  const block = {
+  return {
     type: 'image',
-    alt_text: '添付画像',
-    ...(isSlackFileUrl
+    alt_text: `添付画像 ${index + 1}`,
+    ...(isSlackFileUrl(imageUrl)
       ? { slack_file: { url: imageUrl } }
       : { image_url: imageUrl }),
   };
+}
 
-  if (messageLink) {
-    block.title = {
-      type: 'plain_text',
-      text: 'タップしてメッセージで拡大表示',
-    };
+function buildTaskImageContextBlocks(imageUrls, messageLink) {
+  if (!imageUrls || imageUrls.length === 0) return [];
+
+  const imageElements = imageUrls
+    .map((url, index) => buildTaskImageElement(url, index))
+    .filter(Boolean);
+  if (imageElements.length === 0) return [];
+
+  const blocks = [];
+  const maxElementsPerContext = 10;
+  for (let i = 0; i < imageElements.length; i += maxElementsPerContext) {
+    blocks.push({
+      type: 'context',
+      elements: imageElements.slice(i, i + maxElementsPerContext),
+    });
   }
 
-  return block;
+  if (messageLink) {
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `<${messageLink}|タップしてメッセージで拡大表示>`,
+      }],
+    });
+  }
+
+  return blocks;
 }
 
 async function verifyInstallReadiness(client, botToken) {
@@ -1529,7 +1558,7 @@ app.event('reaction_added', async ({ event, body, client }) => {
       text: messageDetails.text,
       emoji: reaction,
       category,
-      imageUrl: messageDetails.imageUrl,
+      imageUrls: messageDetails.imageUrls,
     });
     console.log('DB保存完了:', task);
   } catch (error) {
