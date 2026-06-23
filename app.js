@@ -326,7 +326,7 @@ function buildHomeView(homeTasks, selectedTab = 'checking', folders = ['未分�
     });
 
     const imageUrls = parseTaskImageUrls(t.imageUrls, t.imageUrl);
-    cardBlocks.push(...buildTaskImageContextBlocks(imageUrls, link));
+    cardBlocks.push(...buildTaskImageBlocks(imageUrls, link));
 
     if (isCheckingTab) {
       cardBlocks.push({
@@ -656,46 +656,33 @@ function isSlackFileUrl(imageUrl) {
   return /files\.slack\.com|files-pri|slack-files|slack\.com\/files/i.test(imageUrl);
 }
 
-function buildTaskImageElement(imageUrl, index) {
+function buildTaskImageBlock(imageUrl, index, messageLink) {
   if (!imageUrl) return null;
 
-  return {
+  const block = {
     type: 'image',
     alt_text: `添付画像 ${index + 1}`,
     ...(isSlackFileUrl(imageUrl)
       ? { slack_file: { url: imageUrl } }
       : { image_url: imageUrl }),
   };
-}
-
-function buildTaskImageContextBlocks(imageUrls, messageLink) {
-  if (!imageUrls || imageUrls.length === 0) return [];
-
-  const imageElements = imageUrls
-    .map((url, index) => buildTaskImageElement(url, index))
-    .filter(Boolean);
-  if (imageElements.length === 0) return [];
-
-  const blocks = [];
-  const maxElementsPerContext = 10;
-  for (let i = 0; i < imageElements.length; i += maxElementsPerContext) {
-    blocks.push({
-      type: 'context',
-      elements: imageElements.slice(i, i + maxElementsPerContext),
-    });
-  }
 
   if (messageLink) {
-    blocks.push({
-      type: 'context',
-      elements: [{
-        type: 'mrkdwn',
-        text: `<${messageLink}|タップしてメッセージで拡大表示>`,
-      }],
-    });
+    block.title = {
+      type: 'plain_text',
+      text: 'タップしてメッセージで拡大表示',
+    };
   }
 
-  return blocks;
+  return block;
+}
+
+function buildTaskImageBlocks(imageUrls, messageLink) {
+  if (!imageUrls || imageUrls.length === 0) return [];
+
+  return imageUrls
+    .map((url, index) => buildTaskImageBlock(url, index, messageLink))
+    .filter(Boolean);
 }
 
 async function verifyInstallReadiness(client, botToken) {
