@@ -573,8 +573,21 @@ async function fetchSlackMessage(client, channelId, messageTs, threadTs = null) 
 }
 
 function getImageThumbnailUrl(imageFile) {
-  return imageFile.thumb_160
-    || imageFile.thumb_360
+  const originalWidth = Number(imageFile.original_w || imageFile.original_width || 0);
+  const originalHeight = Number(imageFile.original_h || imageFile.original_height || 0);
+  const isSmallImage = originalWidth > 0 && originalHeight > 0
+    && originalWidth <= 360 && originalHeight <= 360;
+
+  if (isSmallImage) {
+    return imageFile.url_private
+      || imageFile.thumb_360
+      || imageFile.thumb_160
+      || imageFile.permalink_public
+      || null;
+  }
+
+  return imageFile.thumb_360
+    || imageFile.thumb_160
     || imageFile.thumb_480
     || imageFile.url_private
     || imageFile.permalink_public
@@ -656,33 +669,36 @@ function isSlackFileUrl(imageUrl) {
   return /files\.slack\.com|files-pri|slack-files|slack\.com\/files/i.test(imageUrl);
 }
 
-function buildTaskImageBlock(imageUrl, index, messageLink) {
+function buildTaskImageBlock(imageUrl, index) {
   if (!imageUrl) return null;
 
-  const block = {
+  return {
     type: 'image',
     alt_text: `添付画像 ${index + 1}`,
     ...(isSlackFileUrl(imageUrl)
       ? { slack_file: { url: imageUrl } }
       : { image_url: imageUrl }),
   };
-
-  if (messageLink) {
-    block.title = {
-      type: 'plain_text',
-      text: 'タップしてメッセージで拡大表示',
-    };
-  }
-
-  return block;
 }
 
 function buildTaskImageBlocks(imageUrls, messageLink) {
   if (!imageUrls || imageUrls.length === 0) return [];
 
-  return imageUrls
-    .map((url, index) => buildTaskImageBlock(url, index, messageLink))
+  const blocks = imageUrls
+    .map((url, index) => buildTaskImageBlock(url, index))
     .filter(Boolean);
+
+  if (blocks.length > 0 && messageLink) {
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `<${messageLink}|タップしてメッセージで拡大表示>`,
+      }],
+    });
+  }
+
+  return blocks;
 }
 
 async function verifyInstallReadiness(client, botToken) {
